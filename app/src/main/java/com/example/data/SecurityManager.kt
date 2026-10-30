@@ -3,6 +3,7 @@ package com.example.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.model.LendingSession
+import com.example.model.WhatsAppEntry
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -19,6 +20,7 @@ class SecurityManager(context: Context) {
 
     companion object {
         private const val KEY_SETUP_COMPLETED = "setup_completed"
+        private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_MASTER_HASH = "master_hash"
         private const val KEY_SECONDARY_HASH = "secondary_hash"
         private const val KEY_SECURITY_HINT = "security_hint"
@@ -33,14 +35,29 @@ class SecurityManager(context: Context) {
         // Session History JSON
         private const val KEY_SESSIONS_JSON = "saved_sessions_history"
 
-        // Demo data toggle for emulator testing
+        // WhatsApp Captured Notifications JSON
+        private const val KEY_WHATSAPP_LOGS_JSON = "whatsapp_notifications_log"
+
+        // Demo data toggle (defaulted to false for real new users)
         private const val KEY_DEMO_DATA_ENABLED = "demo_data_enabled"
+
+        // Custom App Name and Icon
+        private const val KEY_CUSTOM_APP_NAME = "custom_app_name"
+        private const val KEY_CUSTOM_APP_ICON = "custom_app_icon"
     }
 
     private fun hashPassword(password: String, salt: String = "DeviceAudit_Salt_9981"): String {
         val bytes = MessageDigest.getInstance("SHA-256")
             .digest((password + salt).toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    fun isOnboardingCompleted(): Boolean {
+        return prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+    }
+
+    fun setOnboardingCompleted(completed: Boolean = true) {
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
     }
 
     fun isSetupCompleted(): Boolean {
@@ -56,6 +73,7 @@ class SecurityManager(context: Context) {
 
         prefs.edit()
             .putBoolean(KEY_SETUP_COMPLETED, true)
+            .putBoolean(KEY_ONBOARDING_COMPLETED, true)
             .putString(KEY_MASTER_HASH, masterHash)
             .putString(KEY_SECONDARY_HASH, secondaryHash)
             .putString(KEY_SECURITY_HINT, hint)
@@ -98,7 +116,6 @@ class SecurityManager(context: Context) {
         val current = prefs.getInt(KEY_FAILED_ATTEMPTS, 0) + 1
         val edit = prefs.edit().putInt(KEY_FAILED_ATTEMPTS, current)
         if (current >= 5) {
-            // Lock out for 30 seconds after 5 failed attempts
             edit.putLong(KEY_LOCKOUT_TIMESTAMP, System.currentTimeMillis() + 30_000L)
         }
         edit.apply()
@@ -153,33 +170,32 @@ class SecurityManager(context: Context) {
         return LendingSession(id = id, borrowerName = name, startTime = now, endTime = null)
     }
 
-    fun endSession(totalCalls: Int, totalSms: Int): LendingSession? {
+    fun endSession(totalCalls: Int, totalSms: Int, totalWhatsApp: Int = 0): LendingSession? {
         val current = getActiveSession() ?: return null
         val now = System.currentTimeMillis()
         val completed = current.copy(
             endTime = now,
             callsRecordedCount = totalCalls,
-            smsRecordedCount = totalSms
+            smsRecordedCount = totalSms,
+            whatsappRecordedCount = totalWhatsApp
         )
 
-        // Clear active session
         prefs.edit()
             .remove(KEY_ACTIVE_SESSION_ID)
             .remove(KEY_ACTIVE_BORROWER)
             .remove(KEY_ACTIVE_START_TIME)
             .apply()
 
-        // Save to past sessions
         saveSessionToHistory(completed)
         return completed
     }
 
     private fun saveSessionToHistory(session: LendingSession) {
         val existing = getSavedSessions().toMutableList()
-        existing.add(0, session) // newest first
+        existing.add(0, session)
 
         val jsonArray = JSONArray()
-        for (s in existing.take(50)) { // keep last 50
+        for (s in existing.take(50)) {
             val obj = JSONObject().apply {
                 put("id", s.id)
                 put("borrower", s.borrowerName)
@@ -187,6 +203,7 @@ class SecurityManager(context: Context) {
                 put("endTime", s.endTime ?: 0L)
                 put("callsCount", s.callsRecordedCount)
                 put("smsCount", s.smsRecordedCount)
+                put("whatsappCount", s.whatsappRecordedCount)
                 put("notes", s.notes)
             }
             jsonArray.put(obj)
@@ -210,6 +227,7 @@ class SecurityManager(context: Context) {
                         endTime = if (endTime > 0L) endTime else null,
                         callsRecordedCount = obj.optInt("callsCount", 0),
                         smsRecordedCount = obj.optInt("smsCount", 0),
+                        whatsappRecordedCount = obj.optInt("whatsappCount", 0),
                         notes = obj.optString("notes", "")
                     )
                 )
@@ -220,13 +238,79 @@ class SecurityManager(context: Context) {
         return list
     }
 
-    // Demo / Sample Data toggle
+    // WhatsApp Notification Capture
+    fun saveWhatsAppEntry(entry: WhatsAppEntry) {
+        val existing = getWhatsAppLogs().toMutableList()
+        // Deduplicate recent identical messages
+        if (existing.any { it.senderOrCaller == entry.senderOrCaller && it.body == entry.body && kotlin.math.abs(it.timestamp - entry.timestamp) < 3000 }) {
+            return
+        }
+        existing.add(0, entry)
+
+        val jsonArray = JSONArray()
+        for (w in existing.take(100)) {
+            val obj = JSONObject().apply {
+                put("id", w.id)
+                put("sender", w.senderOrCaller)
+                put("body", w.body)
+                put("isCall", w.isCall)
+                put("timestamp", w.timestamp)
+            }
+            jsonArray.put(obj)
+        }
+        prefs.edit().putString(KEY_WHATSAPP_LOGS_JSON, jsonArray.toString()).apply()
+    }
+
+    fun getWhatsAppLogs(sinceTimestamp: Long = 0L): List<WhatsAppEntry> {
+        val raw = prefs.getString(KEY_WHATSAPP_LOGS_JSON, null) ?: return emptyList()
+        val list = mutableListOf<WhatsAppEntry>()
+        try {
+            val jsonArray = JSONArray(raw)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val ts = obj.getLong("timestamp")
+                if (sinceTimestamp == 0L || ts >= sinceTimestamp) {
+                    list.add(
+                        WhatsAppEntry(
+                            id = obj.getLong("id"),
+                            senderOrCaller = obj.getString("sender"),
+                            body = obj.optString("body", ""),
+                            isCall = obj.optBoolean("isCall", false),
+                            timestamp = ts
+                        )
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            // fallback
+        }
+        return list
+    }
+
+    // Demo Data Toggle (Default: FALSE so new users see a clean fresh experience)
     fun isDemoDataEnabled(): Boolean {
-        // Enabled by default on fresh install so user sees functional data immediately in the emulator!
-        return prefs.getBoolean(KEY_DEMO_DATA_ENABLED, true)
+        return prefs.getBoolean(KEY_DEMO_DATA_ENABLED, false)
     }
 
     fun setDemoDataEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_DEMO_DATA_ENABLED, enabled).apply()
+    }
+
+    // Custom App Name and Icon (Stealth / Disguise / Personalization)
+    fun getCustomAppName(): String {
+        return prefs.getString(KEY_CUSTOM_APP_NAME, "Device Audit Log") ?: "Device Audit Log"
+    }
+
+    fun setCustomAppName(name: String) {
+        val cleanName = if (name.isBlank()) "Device Audit Log" else name.trim()
+        prefs.edit().putString(KEY_CUSTOM_APP_NAME, cleanName).apply()
+    }
+
+    fun getCustomAppIcon(): String {
+        return prefs.getString(KEY_CUSTOM_APP_ICON, "SHIELD") ?: "SHIELD"
+    }
+
+    fun setCustomAppIcon(iconKey: String) {
+        prefs.edit().putString(KEY_CUSTOM_APP_ICON, iconKey).apply()
     }
 }

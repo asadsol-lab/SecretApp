@@ -9,15 +9,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Visibility
@@ -49,7 +54,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.ui.theme.Amber500
 import com.example.ui.theme.Cyan400
 import com.example.ui.theme.Navy700
@@ -61,6 +65,7 @@ import com.example.ui.theme.Slate400
 
 @Composable
 fun LockScreen(
+    customAppName: String = "Device Audit Log",
     onUnlock: (password: String) -> Boolean,
     lockoutSeconds: Long,
     securityHint: String,
@@ -71,22 +76,30 @@ fun LockScreen(
     var showHintDialog by remember { mutableStateOf(false) }
 
     val isLockedOut = lockoutSeconds > 0
+    val scrollState = rememberScrollState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Navy900)
-            .padding(24.dp)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(20.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Lock icon badge
             Box(
                 modifier = Modifier
-                    .size(90.dp)
+                    .size(86.dp)
                     .background(Navy800, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -94,15 +107,15 @@ fun LockScreen(
                     imageVector = Icons.Default.Lock,
                     contentDescription = "Device Audit Locked",
                     tint = if (isLockedOut) Rose500 else Cyan400,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(46.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "Device Audit Protected",
-                style = MaterialTheme.typography.headlineMedium.copy(
+                text = customAppName,
+                style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold,
                     color = Slate200
                 ),
@@ -118,7 +131,7 @@ fun LockScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = "Enter Master or Backup Password to access activity records.",
@@ -126,7 +139,7 @@ fun LockScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             if (isLockedOut) {
                 Card(
@@ -244,7 +257,7 @@ fun LockScreen(
                         modifier = Modifier.testTag("show_hint_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.HelpOutline,
+                            imageVector = Icons.AutoMirrored.Filled.HelpOutline,
                             contentDescription = "Help Hint",
                             tint = Amber500,
                             modifier = Modifier.size(16.dp)
@@ -258,6 +271,8 @@ fun LockScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(80.dp))
         }
 
         // Hint Dialog

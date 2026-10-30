@@ -11,7 +11,8 @@ data class LendingSession(
     val endTime: Long? = null,
     val notes: String = "",
     val callsRecordedCount: Int = 0,
-    val smsRecordedCount: Int = 0
+    val smsRecordedCount: Int = 0,
+    val whatsappRecordedCount: Int = 0
 ) {
     val isActive: Boolean
         get() = endTime == null
@@ -50,4 +51,5 @@ data class LendingSession(
 sealed class AuditItem(val timestamp: Long) {
     data class Call(val entry: CallEntry) : AuditItem(entry.timestamp)
     data class Sms(val entry: SmsEntry) : AuditItem(entry.timestamp)
+    data class WhatsApp(val entry: WhatsAppEntry) : AuditItem(entry.timestamp)
 }

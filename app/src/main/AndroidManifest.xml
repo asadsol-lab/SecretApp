@@ -28,6 +28,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Privacy-compliant Notification Listener for WhatsApp activity audit -->
+        <service
+            android:name=".service.WhatsAppNotificationListener"
+            android:label="WhatsApp Activity Auditor"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

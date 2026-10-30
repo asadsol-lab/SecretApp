@@ -23,6 +23,7 @@ import com.example.ui.AuditViewModel
 import com.example.ui.screens.ArchiveScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.LockScreen
+import com.example.ui.screens.OnboardingScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SetupPasswordScreen
 import com.example.ui.theme.MyApplicationTheme
@@ -70,12 +71,18 @@ class MainActivity : ComponentActivity() {
                         when (uiState.currentScreen) {
                             AppScreen.ARCHIVE -> viewModel.navigateTo(AppScreen.DASHBOARD)
                             AppScreen.SETTINGS -> viewModel.navigateTo(AppScreen.DASHBOARD)
-                            AppScreen.DASHBOARD -> viewModel.lockApp() // Lock app on exit for maximum privacy
-                            AppScreen.LOCK, AppScreen.SETUP -> finish()
+                            AppScreen.DASHBOARD -> viewModel.lockApp()
+                            AppScreen.LOCK, AppScreen.SETUP, AppScreen.ONBOARDING -> finish()
                         }
                     }
 
                     when (uiState.currentScreen) {
+                        AppScreen.ONBOARDING -> {
+                            OnboardingScreen(
+                                onComplete = { viewModel.completeOnboarding() }
+                            )
+                        }
+
                         AppScreen.SETUP -> {
                             SetupPasswordScreen(
                                 onSetupComplete = { master, secondary, hint ->
@@ -87,6 +94,7 @@ class MainActivity : ComponentActivity() {
 
                         AppScreen.LOCK -> {
                             LockScreen(
+                                customAppName = uiState.customAppName,
                                 onUnlock = { password ->
                                     viewModel.unlockWithPassword(password)
                                 },
@@ -153,6 +161,11 @@ class MainActivity : ComponentActivity() {
 
                         AppScreen.SETTINGS -> {
                             SettingsScreen(
+                                customAppName = uiState.customAppName,
+                                customAppIcon = uiState.customAppIcon,
+                                onUpdateBranding = { name, iconKey ->
+                                    viewModel.updateCustomBranding(name, iconKey)
+                                },
                                 isDemoDataEnabled = uiState.isDemoDataEnabled,
                                 onToggleDemoData = { enabled ->
                                     viewModel.toggleDemoData(enabled)

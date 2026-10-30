@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Sms
@@ -28,18 +29,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.model.AuditItem
 import com.example.ui.theme.Cyan400
-import com.example.ui.theme.Emerald400
-import com.example.ui.theme.Navy700
 import com.example.ui.theme.Navy800
 import com.example.ui.theme.Navy900
-import com.example.ui.theme.Rose500
 import com.example.ui.theme.Slate200
 import com.example.ui.theme.Slate400
 
@@ -59,6 +57,12 @@ fun ActivityDetailDialog(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 // Header
+                val (title, icon, iconColor) = when (item) {
+                    is AuditItem.Call -> Triple("Call Audit Detail", Icons.Default.Phone, Cyan400)
+                    is AuditItem.Sms -> Triple("SMS Audit Detail", Icons.Default.Sms, Cyan400)
+                    is AuditItem.WhatsApp -> Triple("WhatsApp Audit Detail", Icons.AutoMirrored.Filled.Chat, Color(0xFF25D366))
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -68,19 +72,19 @@ fun ActivityDetailDialog(
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
-                                .background(Cyan400.copy(alpha = 0.15f), CircleShape),
+                                .background(iconColor.copy(alpha = 0.15f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (item is AuditItem.Call) Icons.Default.Phone else Icons.Default.Sms,
+                                imageVector = icon,
                                 contentDescription = null,
-                                tint = Cyan400,
+                                tint = iconColor,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = if (item is AuditItem.Call) "Call Audit Detail" else "SMS Audit Detail",
+                            text = title,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Slate200
@@ -145,6 +149,49 @@ fun ActivityDetailDialog(
                                 color = Slate200,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(14.dp)
+                            )
+                        }
+                    }
+                    is AuditItem.WhatsApp -> {
+                        val wa = item.entry
+                        DetailRow("WhatsApp Contact", wa.senderOrCaller)
+                        DetailRow("Activity Type", if (wa.isCall) "WhatsApp Voice/Video Call Event" else "Incoming WhatsApp Message")
+                        DetailRow("Timestamp", wa.formattedTime)
+
+                        if (!wa.isCall && wa.body.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Captured Notification Text:",
+                                color = Slate200,
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Surface(
+                                color = Navy900,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = wa.body,
+                                    color = Slate200,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(14.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Surface(
+                            color = Navy900,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "WhatsApp activity Android Notification Listener API ke zariye capture hoti hai jo 100% Android privacy policy ke mutabiq hai.",
+                                color = Slate400,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(12.dp)
                             )
                         }
                     }

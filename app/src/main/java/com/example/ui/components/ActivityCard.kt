@@ -16,10 +16,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.CallMissed
 import androidx.compose.material.icons.filled.MarkEmailRead
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhoneDisabled
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -37,16 +39,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.AuditItem
 import com.example.model.CallEntry
 import com.example.model.CallType
 import com.example.model.SmsEntry
 import com.example.model.SmsType
+import com.example.model.WhatsAppEntry
 import com.example.ui.theme.CardDark
 import com.example.ui.theme.Cyan400
 import com.example.ui.theme.Emerald400
 import com.example.ui.theme.Navy700
-import com.example.ui.theme.Navy800
 import com.example.ui.theme.Rose500
 import com.example.ui.theme.Slate200
 import com.example.ui.theme.Slate400
@@ -70,7 +71,7 @@ fun CallActivityCard(
             "Incoming Call"
         )
         CallType.MISSED -> Quad(
-            Icons.Default.CallMissed,
+            Icons.AutoMirrored.Filled.CallMissed,
             Rose500,
             Rose500.copy(alpha = 0.15f),
             "Missed Call"
@@ -103,7 +104,6 @@ fun CallActivityCard(
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Type Icon
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -137,7 +137,6 @@ fun CallActivityCard(
                         modifier = Modifier.weight(1f, fill = false)
                     )
 
-                    // Call duration pill
                     Surface(
                         color = Navy700,
                         shape = RoundedCornerShape(8.dp),
@@ -261,6 +260,99 @@ fun SmsActivityCard(
 
                 Text(
                     text = sms.formattedTime,
+                    style = MaterialTheme.typography.labelSmall.copy(color = Slate400),
+                    fontSize = 11.sp,
+                    modifier = Modifier.align(Alignment.End)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun WhatsAppActivityCard(
+    whatsapp: WhatsAppEntry,
+    onClick: () -> Unit
+) {
+    val isCall = whatsapp.isCall
+    val icon = if (isCall) Icons.Default.Phone else Icons.AutoMirrored.Filled.Chat
+    val brandGreen = Color(0xFF25D366)
+    val bgTint = brandGreen.copy(alpha = 0.15f)
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CardDark),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .testTag("whatsapp_card_${whatsapp.id}")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(bgTint, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = "WhatsApp",
+                    tint = brandGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = whatsapp.displayTitle,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate200
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+
+                    Surface(
+                        color = Navy700,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text(
+                            text = if (isCall) "WA Call" else "WhatsApp",
+                            color = brandGreen,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = if (isCall) "WhatsApp Voice / Video Call Event" else whatsapp.body.ifBlank { "Incoming WhatsApp Message" },
+                    style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = whatsapp.formattedTime,
                     style = MaterialTheme.typography.labelSmall.copy(color = Slate400),
                     fontSize = 11.sp,
                     modifier = Modifier.align(Alignment.End)

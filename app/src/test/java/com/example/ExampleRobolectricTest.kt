@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.SecurityManager
 import com.example.data.VerifiedPasswordType
+import com.example.model.WhatsAppEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -58,10 +59,42 @@ class ExampleRobolectricTest {
         assertTrue(securityManager.isSessionActive())
         assertEquals("Friend Bilal", session.borrowerName)
 
-        val endedSession = securityManager.endSession(totalCalls = 3, totalSms = 2)
+        val endedSession = securityManager.endSession(totalCalls = 3, totalSms = 2, totalWhatsApp = 1)
         assertNotNull(endedSession)
         assertFalse(securityManager.isSessionActive())
         assertEquals(3, endedSession?.callsRecordedCount)
         assertEquals(2, endedSession?.smsRecordedCount)
+        assertEquals(1, endedSession?.whatsappRecordedCount)
+    }
+
+    @Test
+    fun `test custom app name and icon disguise`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val securityManager = SecurityManager(context)
+
+        securityManager.setCustomAppName("Calculator Plus")
+        securityManager.setCustomAppIcon("CALCULATOR")
+
+        assertEquals("Calculator Plus", securityManager.getCustomAppName())
+        assertEquals("CALCULATOR", securityManager.getCustomAppIcon())
+    }
+
+    @Test
+    fun `test whatsapp notification storage`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val securityManager = SecurityManager(context)
+
+        val now = System.currentTimeMillis()
+        val entry = WhatsAppEntry(
+            id = 555L,
+            senderOrCaller = "Ali WhatsApp",
+            body = "Meeting at 4pm",
+            isCall = false,
+            timestamp = now
+        )
+
+        securityManager.saveWhatsAppEntry(entry)
+        val logs = securityManager.getWhatsAppLogs()
+        assertTrue(logs.any { it.senderOrCaller == "Ali WhatsApp" && it.body == "Meeting at 4pm" })
     }
 }

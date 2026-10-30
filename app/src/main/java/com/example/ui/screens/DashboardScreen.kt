@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -20,8 +22,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
@@ -50,6 +55,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,6 +73,7 @@ import com.example.ui.components.ActivityDetailDialog
 import com.example.ui.components.CallActivityCard
 import com.example.ui.components.LendingSessionCard
 import com.example.ui.components.SmsActivityCard
+import com.example.ui.components.WhatsAppActivityCard
 import com.example.ui.theme.CardDark
 import com.example.ui.theme.Cyan400
 import com.example.ui.theme.Emerald400
@@ -92,12 +101,21 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit,
     onRequestPermissions: () -> Unit
 ) {
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.statusMessage) {
         uiState.statusMessage?.let {
             snackbarHostState.showSnackbar(it)
         }
+    }
+
+    val headerIcon: ImageVector = when (uiState.customAppIcon) {
+        "CALCULATOR" -> Icons.Default.Calculate
+        "NOTES" -> Icons.Default.Description
+        "SETTINGS" -> Icons.Default.Settings
+        "VAULT" -> Icons.Default.Lock
+        else -> Icons.Default.Security
     }
 
     Scaffold(
@@ -112,7 +130,7 @@ fun DashboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Security,
+                                imageVector = headerIcon,
                                 contentDescription = null,
                                 tint = Cyan400,
                                 modifier = Modifier.size(20.dp)
@@ -121,7 +139,7 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Device Audit Log",
+                                text = uiState.customAppName,
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = Slate200
@@ -161,11 +179,10 @@ fun DashboardScreen(
         containerColor = Navy900
     ) { innerPadding ->
 
-        // Prepare unified filtered items
         val searchLower = uiState.searchQuery.lowercase().trim()
 
         val filteredCalls = uiState.calls.filter { call ->
-            val matchesType = uiState.typeFilter != ItemTypeFilter.SMS_ONLY
+            val matchesType = uiState.typeFilter == ItemTypeFilter.ALL || uiState.typeFilter == ItemTypeFilter.CALLS_ONLY
             val matchesSearch = searchLower.isEmpty() ||
                     call.number.lowercase().contains(searchLower) ||
                     (call.cachedName?.lowercase()?.contains(searchLower) == true)
@@ -173,7 +190,7 @@ fun DashboardScreen(
         }.map { AuditItem.Call(it) }
 
         val filteredSms = uiState.sms.filter { sms ->
-            val matchesType = uiState.typeFilter != ItemTypeFilter.CALLS_ONLY
+            val matchesType = uiState.typeFilter == ItemTypeFilter.ALL || uiState.typeFilter == ItemTypeFilter.SMS_ONLY
             val matchesSearch = searchLower.isEmpty() ||
                     sms.address.lowercase().contains(searchLower) ||
                     (sms.cachedName?.lowercase()?.contains(searchLower) == true) ||
@@ -181,13 +198,21 @@ fun DashboardScreen(
             matchesType && matchesSearch
         }.map { AuditItem.Sms(it) }
 
-        val combinedItems = (filteredCalls + filteredSms).sortedByDescending { it.timestamp }
+        val filteredWhatsApp = uiState.whatsapp.filter { wa ->
+            val matchesType = uiState.typeFilter == ItemTypeFilter.ALL || uiState.typeFilter == ItemTypeFilter.WHATSAPP_ONLY
+            val matchesSearch = searchLower.isEmpty() ||
+                    wa.senderOrCaller.lowercase().contains(searchLower) ||
+                    wa.body.lowercase().contains(searchLower)
+            matchesType && matchesSearch
+        }.map { AuditItem.WhatsApp(it) }
 
-        // Metrics counts
+        val combinedItems = (filteredCalls + filteredSms + filteredWhatsApp).sortedByDescending { it.timestamp }
+
         val outgoingCount = uiState.calls.count { it.type == CallType.OUTGOING }
         val incomingCount = uiState.calls.count { it.type == CallType.INCOMING }
         val missedCount = uiState.calls.count { it.type == CallType.MISSED }
         val totalSmsCount = uiState.sms.size
+        val totalWaCount = uiState.whatsapp.size
 
         val currentSessionStart = uiState.activeSession?.startTime ?: 0L
         val callsDuringSession = if (currentSessionStart > 0) uiState.calls.count { it.timestamp >= currentSessionStart } else 0
@@ -218,7 +243,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Apne mobile ke live calls aur SMS read karne ke liye Android permissions ki zaroorat hai. (Demo mode active hai taake aap test kar sakein).",
+                                text = "Mobile ke live calls aur SMS read karne ke liye permissions ki zaroorat hai.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = Slate400)
                             )
                             Spacer(modifier = Modifier.height(10.dp))
@@ -232,6 +257,68 @@ fun DashboardScreen(
                             ) {
                                 Text("Grant Call & SMS Permissions", fontWeight = FontWeight.Bold)
                             }
+                        }
+                    }
+                }
+            }
+
+            // WhatsApp Notification Listener Enable Banner
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardDark),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .background(Color(0xFF25D366).copy(alpha = 0.15f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = null,
+                                    tint = Color(0xFF25D366),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "WhatsApp Audit Access",
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Slate200
+                                    )
+                                )
+                                Text(
+                                    text = "Android privacy notification listener",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366), contentColor = Navy900),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("Enable", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -252,7 +339,7 @@ fun DashboardScreen(
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     MetricChip(
                         title = "Outgoing",
@@ -277,6 +364,12 @@ fun DashboardScreen(
                         count = totalSmsCount,
                         color = Slate200,
                         modifier = Modifier.weight(1f)
+                    )
+                    MetricChip(
+                        title = "WhatsApp",
+                        count = totalWaCount,
+                        color = Color(0xFF25D366),
+                        modifier = Modifier.weight(1.1f)
                     )
                 }
             }
@@ -307,7 +400,6 @@ fun DashboardScreen(
             // Filter Chips (Time & Type)
             item {
                 Column {
-                    // Time filters
                     val timeScroll = rememberScrollState()
                     Row(
                         modifier = Modifier
@@ -334,9 +426,11 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Type filters
+                    val typeScroll = rememberScrollState()
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(typeScroll),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         ItemTypeFilter.values().forEach { filter ->
@@ -351,7 +445,7 @@ fun DashboardScreen(
                                     containerColor = CardDark,
                                     labelColor = Slate200
                                 ),
-                                modifier = Modifier.weight(1f).testTag("filter_type_${filter.name}")
+                                modifier = Modifier.testTag("filter_type_${filter.name}")
                             )
                         }
                     }
@@ -387,7 +481,7 @@ fun DashboardScreen(
                 }
             }
 
-            // Empty state
+            // Empty state (Clean for new users)
             if (combinedItems.isEmpty()) {
                 item {
                     Card(
@@ -402,7 +496,7 @@ fun DashboardScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "No Calls or SMS Found",
+                                text = "No Activity Recorded Yet",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = Slate200
@@ -410,7 +504,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Is waqt ke doran koi call ya message record nahi hua, ya filters change kar ke 'All Time' check karein.",
+                                text = "Is waqt ke doran koi call, SMS ya WhatsApp message record nahi hua. Jab phone kisi ko dein toh upar se 'Start Lending Session' shuru karein.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
                                 textAlign = TextAlign.Center
                             )
@@ -422,6 +516,7 @@ fun DashboardScreen(
                     when (it) {
                         is AuditItem.Call -> "call_${it.entry.id}"
                         is AuditItem.Sms -> "sms_${it.entry.id}"
+                        is AuditItem.WhatsApp -> "wa_${it.entry.id}"
                     }
                 }) { item ->
                     when (item) {
@@ -434,6 +529,12 @@ fun DashboardScreen(
                         is AuditItem.Sms -> {
                             SmsActivityCard(
                                 sms = item.entry,
+                                onClick = { onItemClick(item) }
+                            )
+                        }
+                        is AuditItem.WhatsApp -> {
+                            WhatsAppActivityCard(
+                                whatsapp = item.entry,
                                 onClick = { onItemClick(item) }
                             )
                         }
