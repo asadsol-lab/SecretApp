@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Visibility
@@ -35,6 +36,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -56,6 +58,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.Amber500
 import com.example.ui.theme.Cyan400
+import com.example.ui.theme.Emerald400
 import com.example.ui.theme.Navy700
 import com.example.ui.theme.Navy800
 import com.example.ui.theme.Navy900
@@ -66,13 +69,15 @@ import com.example.ui.theme.Slate400
 @Composable
 fun LockScreen(
     customAppName: String = "Device Audit Log",
-    onUnlock: (password: String) -> Boolean,
+    isBiometricEnabled: Boolean = true,
+    onUnlockWithPin: (pin: String) -> Boolean,
+    onBiometricClick: () -> Unit,
     lockoutSeconds: Long,
     securityHint: String,
     errorMessage: String?
 ) {
-    var passwordInput by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
+    var pinInput by remember { mutableStateOf("") }
+    var showPin by remember { mutableStateOf(false) }
     var showHintDialog by remember { mutableStateOf(false) }
 
     val isLockedOut = lockoutSeconds > 0
@@ -123,7 +128,7 @@ fun LockScreen(
             )
 
             Text(
-                text = "Owner Access Only • Dual Password Security",
+                text = "Owner Protection • Secure Device Audit",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     color = Cyan400,
                     fontWeight = FontWeight.Medium
@@ -134,7 +139,7 @@ fun LockScreen(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "Enter Master or Backup Password to access activity records.",
+                text = "Enter Master PIN or use your registered fingerprint to unlock.",
                 style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
                 textAlign = TextAlign.Center
             )
@@ -166,7 +171,7 @@ fun LockScreen(
                     }
                 }
             } else {
-                // Password Card
+                // PIN Input Card
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Navy800),
                     shape = RoundedCornerShape(16.dp),
@@ -174,28 +179,28 @@ fun LockScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         OutlinedTextField(
-                            value = passwordInput,
-                            onValueChange = { passwordInput = it },
-                            label = { Text("Master or Backup Password") },
-                            placeholder = { Text("Enter owner password") },
+                            value = pinInput,
+                            onValueChange = { pinInput = it },
+                            label = { Text("Master PIN") },
+                            placeholder = { Text("Enter 4-digit PIN") },
                             singleLine = true,
-                            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                            visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
+                                keyboardType = KeyboardType.NumberPassword,
                                 imeAction = ImeAction.Done
                             ),
                             keyboardActions = KeyboardActions(
                                 onDone = {
-                                    if (passwordInput.isNotBlank()) {
-                                        val unlocked = onUnlock(passwordInput)
-                                        if (!unlocked) passwordInput = ""
+                                    if (pinInput.isNotBlank()) {
+                                        val unlocked = onUnlockWithPin(pinInput)
+                                        if (!unlocked) pinInput = ""
                                     }
                                 }
                             ),
                             trailingIcon = {
-                                IconButton(onClick = { showPassword = !showPassword }) {
+                                IconButton(onClick = { showPin = !showPin }) {
                                     Icon(
-                                        imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        imageVector = if (showPin) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                         contentDescription = "Toggle Visibility",
                                         tint = Slate400
                                     )
@@ -209,7 +214,7 @@ fun LockScreen(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .testTag("unlock_password_input")
+                                .testTag("unlock_pin_input")
                         )
 
                         if (errorMessage != null) {
@@ -221,16 +226,16 @@ fun LockScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         Button(
                             onClick = {
-                                if (passwordInput.isNotBlank()) {
-                                    val unlocked = onUnlock(passwordInput)
-                                    if (!unlocked) passwordInput = ""
+                                if (pinInput.isNotBlank()) {
+                                    val unlocked = onUnlockWithPin(pinInput)
+                                    if (!unlocked) pinInput = ""
                                 }
                             },
-                            enabled = passwordInput.isNotBlank(),
+                            enabled = pinInput.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(containerColor = Cyan400, contentColor = Navy900),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
@@ -241,16 +246,41 @@ fun LockScreen(
                             Icon(imageVector = Icons.Default.LockOpen, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Unlock & View Records",
+                                text = "Unlock with PIN",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
+                        }
+
+                        // Fingerprint Action Button
+                        if (isBiometricEnabled) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = onBiometricClick,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("biometric_unlock_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = "Fingerprint",
+                                    tint = Emerald400
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Scan Fingerprint",
+                                    color = Slate200,
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                            }
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Forgot / Hint option
+                // Recovery Hint Option
                 if (securityHint.isNotBlank()) {
                     TextButton(
                         onClick = { showHintDialog = true },
@@ -264,7 +294,7 @@ fun LockScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Forgot Password? View Hint",
+                            text = "Forgot PIN? View Hint",
                             color = Amber500,
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
                         )
@@ -280,12 +310,12 @@ fun LockScreen(
             AlertDialog(
                 onDismissRequest = { showHintDialog = false },
                 title = {
-                    Text("Security Password Hint", color = Slate200, fontWeight = FontWeight.Bold)
+                    Text("Security PIN Hint", color = Slate200, fontWeight = FontWeight.Bold)
                 },
                 text = {
                     Column {
                         Text(
-                            text = "Owner's saved password hint:",
+                            text = "Your saved recovery hint:",
                             color = Slate400,
                             style = MaterialTheme.typography.bodyMedium
                         )

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,16 +21,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,7 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,48 +56,19 @@ import com.example.ui.theme.Navy800
 import com.example.ui.theme.Navy900
 import com.example.ui.theme.Slate200
 import com.example.ui.theme.Slate400
-
-data class OnboardingPage(
-    val title: String,
-    val subtitle: String,
-    val description: String,
-    val icon: ImageVector,
-    val highlightColor: androidx.compose.ui.graphics.Color
-)
+import com.example.util.DeviceOemHelper
+import com.example.util.OemDeviceInfo
 
 @Composable
 fun OnboardingScreen(
+    oemInfo: OemDeviceInfo,
+    isBatteryOptimizationIgnored: Boolean,
     onComplete: () -> Unit
 ) {
-    val pages = remember {
-        listOf(
-            OnboardingPage(
-                title = "Device Activity Audit",
-                subtitle = "Jab kisi ko phone dein, exact hisab check karein",
-                description = "Phone kisi dost ya kisi ko dene se pehle sirf 1-click se Lending Session start karein. Wapas milne par app bataye gi ke us ne kis ko call ki, kitne minute baat hui aur kya SMS aaye.",
-                icon = Icons.Default.Phone,
-                highlightColor = Cyan400
-            ),
-            OnboardingPage(
-                title = "Dual-Password Security",
-                subtitle = "2 Alag Passwords • Fingerprint Bypass Disabled",
-                description = "App ke liye 2 alag passwords (Master Owner aur Secondary Backup) honge. Fingerprint bilkul disable rakha gaya hai taake koi aap ke sote waqt ya zabardasti app na khol sake.",
-                icon = Icons.Default.Lock,
-                highlightColor = Emerald400
-            ),
-            OnboardingPage(
-                title = "Calls, SMS & WhatsApp",
-                subtitle = "Android Privacy Guidelines Ke Ain Mutabiq",
-                description = "Android ki official privacy policies ke tehat call logs, SMS, aur Notification Listener ke zariye WhatsApp calls aur messages ka audit mehfooz tareeqay se karta hai.",
-                icon = Icons.Default.Security,
-                highlightColor = Cyan400
-            )
-        )
-    }
-
+    val context = LocalContext.current
     var currentPageIndex by remember { mutableIntStateOf(0) }
-    val currentPage = pages[currentPageIndex]
-    val isLastPage = currentPageIndex == pages.size - 1
+    val totalPages = 4
+    val isLastPage = currentPageIndex == totalPages - 1
 
     Box(
         modifier = Modifier
@@ -102,7 +76,7 @@ fun OnboardingScreen(
             .background(Navy900)
             .padding(24.dp)
     ) {
-        // Skip Button at top right
+        // Skip Button
         if (!isLastPage) {
             TextButton(
                 onClick = onComplete,
@@ -118,95 +92,142 @@ fun OnboardingScreen(
             }
         }
 
-        // Main Slide Content
+        // Slide Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(vertical = 40.dp),
+                .padding(vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             AnimatedContent(
-                targetState = currentPage,
+                targetState = currentPageIndex,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "onboarding_animation"
             ) { page ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Big Rounded Hero Icon
-                    Box(
-                        modifier = Modifier
-                            .size(110.dp)
-                            .background(Navy800, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .background(page.highlightColor.copy(alpha = 0.15f), CircleShape),
-                            contentAlignment = Alignment.Center
+                when (page) {
+                    0 -> {
+                        // Slide 1: Phone Lending Audit
+                        OnboardingSlide(
+                            icon = Icons.Default.Phone,
+                            iconColor = Cyan400,
+                            title = "Device Activity Auditor",
+                            subtitle = "Audit calls & SMS when lending your phone",
+                            description = "Before handing your device to a friend or coworker, start a 1-tap Lending Session. When you get your phone back, see the exact calls made, call duration, and messages sent."
+                        )
+                    }
+                    1 -> {
+                        // Slide 2: Device OEM Recognition & Battery Optimization
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(
-                                imageVector = page.icon,
-                                contentDescription = null,
-                                tint = page.highlightColor,
-                                modifier = Modifier.size(44.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(90.dp)
+                                    .background(Navy800, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.BatteryChargingFull,
+                                    contentDescription = null,
+                                    tint = Emerald400,
+                                    modifier = Modifier.size(44.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            Text(
+                                text = "Device Optimization Check",
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Slate200
+                                ),
+                                textAlign = TextAlign.Center
                             )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = "Detected: ${oemInfo.brandDisplayName} (${oemInfo.model})",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Emerald400
+                                ),
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = CardDark),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        text = oemInfo.guidanceTitle,
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Slate200
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = oemInfo.guidanceDescription,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = Slate400,
+                                            lineHeight = 18.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    OutlinedButton(
+                                        onClick = { DeviceOemHelper.openBatteryOptimizationSettings(context) },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = if (isBatteryOptimizationIgnored) "Optimization Disabled (Active)" else "Allow Unrestricted Background",
+                                            color = Emerald400,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Text(
-                        text = page.title,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Slate200
-                        ),
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = page.subtitle,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = page.highlightColor
-                        ),
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CardDark),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = page.description,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = Slate400,
-                                lineHeight = 22.sp
-                            ),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(20.dp)
+                    2 -> {
+                        // Slide 3: PIN & Fingerprint
+                        OnboardingSlide(
+                            icon = Icons.Default.Fingerprint,
+                            iconColor = Cyan400,
+                            title = "PIN & Biometric Security",
+                            subtitle = "Master PIN + Fingerprint Unlock",
+                            description = "Lock the app with a single Master Security PIN. You can also scan your fingerprint for fast, seamless biometric unlocking. Nobody can view or tamper with your history without your authorization."
+                        )
+                    }
+                    3 -> {
+                        // Slide 4: Cloud Firestore Sync
+                        OnboardingSlide(
+                            icon = Icons.Default.CloudDone,
+                            iconColor = Emerald400,
+                            title = "Cloud Backup & Sync",
+                            subtitle = "Never lose your audit records",
+                            description = "Sign in with your Google account in Settings to sync all lending sessions, calls, SMS, and WhatsApp audit records directly to your secure Cloud Firestore database."
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             // Indicator Dots
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                pages.forEachIndexed { index, _ ->
+                repeat(totalPages) { index ->
                     val isSelected = index == currentPageIndex
                     Box(
                         modifier = Modifier
@@ -220,9 +241,9 @@ fun OnboardingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(30.dp))
 
-            // Next / Get Started Button
+            // Next / Finish Button
             Button(
                 onClick = {
                     if (isLastPage) {
@@ -245,7 +266,7 @@ fun OnboardingScreen(
                     Icon(imageVector = Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Set Up Dual Passwords",
+                        text = "Set Up Master PIN",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                 } else {
@@ -257,6 +278,81 @@ fun OnboardingScreen(
                     Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingSlide(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconColor: androidx.compose.ui.graphics.Color,
+    title: String,
+    subtitle: String,
+    description: String
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(90.dp)
+                .background(Navy800, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(66.dp)
+                    .background(iconColor.copy(alpha = 0.15f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(38.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = Slate200
+            ),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = iconColor
+            ),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardDark),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = Slate400,
+                    lineHeight = 20.sp
+                ),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(18.dp)
+            )
         }
     }
 }

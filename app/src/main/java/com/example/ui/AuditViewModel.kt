@@ -4,15 +4,17 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.CallLogRepository
+import com.example.data.FirestoreSyncManager
 import com.example.data.SampleDataProvider
 import com.example.data.SecurityManager
 import com.example.data.SmsLogRepository
-import com.example.data.VerifiedPasswordType
 import com.example.model.AuditItem
 import com.example.model.CallEntry
 import com.example.model.LendingSession
 import com.example.model.SmsEntry
 import com.example.model.WhatsAppEntry
+import com.example.util.DeviceOemHelper
+import com.example.util.OemDeviceInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,11 +32,11 @@ enum class AppScreen {
 }
 
 enum class TimeFilter(val title: String, val subtitle: String) {
-    SESSION("Lending Session", "Sirf is session ka record"),
-    LAST_1_HOUR("Last 1 Hour", "Pichlay 1 ghantay ka"),
-    LAST_4_HOURS("Last 4 Hours", "Pichlay 4 ghanton ka"),
-    TODAY("Today", "Aaj ka mukammal record"),
-    ALL_TIME("All Time", "Tamam records")
+    SESSION("Lending Session", "Records for this session only"),
+    LAST_1_HOUR("Last 1 Hour", "Past 60 minutes"),
+    LAST_4_HOURS("Last 4 Hours", "Past 4 hours"),
+    TODAY("Today", "Today's complete records"),
+    ALL_TIME("All Time", "All available history")
 }
 
 enum class ItemTypeFilter(val title: String) {
@@ -49,9 +51,9 @@ data class AuditUiState(
     val isOnboardingCompleted: Boolean = false,
     val isSetupCompleted: Boolean = false,
     val isAuthenticated: Boolean = false,
-    val authenticatedUserType: VerifiedPasswordType? = null,
     val lockoutSeconds: Long = 0L,
     val securityHint: String = "",
+    val isBiometricEnabled: Boolean = true,
     val activeSession: LendingSession? = null,
     val savedSessions: List<LendingSession> = emptyList(),
     val calls: List<CallEntry> = emptyList(),
@@ -66,6 +68,11 @@ data class AuditUiState(
     val customAppName: String = "Device Audit Log",
     val customAppIcon: String = "SHIELD",
     val isRefreshing: Boolean = false,
+    val isCloudSyncing: Boolean = false,
+    val userEmail: String? = null,
+    val userDisplayName: String? = null,
+    val oemDeviceInfo: OemDeviceInfo = DeviceOemHelper.getDeviceInfo(),
+    val isBatteryOptimizationIgnored: Boolean = false,
     val selectedDetailItem: AuditItem? = null,
     val statusMessage: String? = null
 )
@@ -74,6 +81,7 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
     private val securityManager = SecurityManager(application)
     private val callRepo = CallLogRepository(application)
     private val smsRepo = SmsLogRepository(application)
+    private val firestoreSync = FirestoreSyncManager(application)
 
     private val _uiState = MutableStateFlow(AuditUiState())
     val uiState: StateFlow<AuditUiState> = _uiState.asStateFlow()
@@ -92,6 +100,9 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         val hint = securityManager.getSecurityHint()
         val customName = securityManager.getCustomAppName()
         val customIcon = securityManager.getCustomAppIcon()
+        val biometricEnabled = securityManager.isBiometricEnabled()
+        val currentUser = firestoreSync.getCurrentUser()
+        val batteryIgnored = DeviceOemHelper.isBatteryOptimizationIgnored(getApplication())
 
         val initialScreen = when {
             !onbCompleted -> AppScreen.ONBOARDING
@@ -111,6 +122,10 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
                 securityHint = hint,
                 customAppName = customName,
                 customAppIcon = customIcon,
+                isBiometricEnabled = biometricEnabled,
+                userEmail = currentUser?.email,
+                userDisplayName = currentUser?.displayName,
+                isBatteryOptimizationIgnored = batteryIgnored,
                 timeFilter = if (activeSession != null) TimeFilter.SESSION else TimeFilter.TODAY
             )
         }
@@ -142,26 +157,21 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun completeSetup(masterPass: String, secondaryPass: String, hint: String): Boolean {
-        if (masterPass.length < 4 || secondaryPass.length < 4) {
-            _uiState.update { it.copy(statusMessage = "Passwords must be at least 4 characters long.") }
-            return false
-        }
-        if (masterPass == secondaryPass) {
-            _uiState.update { it.copy(statusMessage = "Master and Backup passwords must be different.") }
+    fun completeSetup(pin: String, hint: String): Boolean {
+        if (pin.length < 4) {
+            _uiState.update { it.copy(statusMessage = "PIN must be at least 4 digits.") }
             return false
         }
 
-        val success = securityManager.setupPasswords(masterPass, secondaryPass, hint)
+        val success = securityManager.setupPin(pin, hint)
         if (success) {
             _uiState.update {
                 it.copy(
                     isSetupCompleted = true,
                     isOnboardingCompleted = true,
                     isAuthenticated = true,
-                    authenticatedUserType = VerifiedPasswordType.MASTER_ADMIN,
                     currentScreen = AppScreen.DASHBOARD,
-                    statusMessage = "Passwords successfully set! App unlocked."
+                    statusMessage = "Master PIN successfully saved! App unlocked."
                 )
             }
             refreshLogs()
@@ -170,18 +180,17 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
-    fun unlockWithPassword(input: String): Boolean {
+    fun unlockWithPin(input: String): Boolean {
         if (securityManager.isLockedOut() > 0) {
-            _uiState.update { it.copy(statusMessage = "Too many failed attempts. Please wait.") }
+            _uiState.update { it.copy(statusMessage = "Security lockout active. Please wait.") }
             return false
         }
 
-        val verified = securityManager.verifyPassword(input)
-        if (verified != null) {
+        val verified = securityManager.verifyPin(input)
+        if (verified) {
             _uiState.update {
                 it.copy(
                     isAuthenticated = true,
-                    authenticatedUserType = verified,
                     currentScreen = AppScreen.DASHBOARD,
                     statusMessage = null
                 )
@@ -196,18 +205,34 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update {
                 it.copy(
                     lockoutSeconds = remaining,
-                    statusMessage = "Incorrect password! Access denied."
+                    statusMessage = "Incorrect PIN! Access denied."
                 )
             }
             return false
         }
     }
 
+    fun unlockWithBiometric(): Boolean {
+        if (securityManager.isLockedOut() > 0) {
+            _uiState.update { it.copy(statusMessage = "Security lockout active. Please wait.") }
+            return false
+        }
+
+        _uiState.update {
+            it.copy(
+                isAuthenticated = true,
+                currentScreen = AppScreen.DASHBOARD,
+                statusMessage = null
+            )
+        }
+        refreshLogs()
+        return true
+    }
+
     fun lockApp() {
         _uiState.update {
             it.copy(
                 isAuthenticated = false,
-                authenticatedUserType = null,
                 currentScreen = AppScreen.LOCK,
                 selectedDetailItem = null
             )
@@ -267,6 +292,15 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         refreshLogs()
+
+        // Sync to Firestore if signed in
+        completed?.let { session ->
+            if (firestoreSync.isUserSignedIn()) {
+                viewModelScope.launch {
+                    firestoreSync.syncSession(session)
+                }
+            }
+        }
     }
 
     fun setTimeFilter(filter: TimeFilter) {
@@ -292,6 +326,11 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         refreshLogs()
     }
 
+    fun setBiometricEnabled(enabled: Boolean) {
+        securityManager.setBiometricEnabled(enabled)
+        _uiState.update { it.copy(isBiometricEnabled = enabled) }
+    }
+
     fun updateCustomBranding(name: String, iconKey: String) {
         securityManager.setCustomAppName(name)
         securityManager.setCustomAppIcon(iconKey)
@@ -299,20 +338,92 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 customAppName = securityManager.getCustomAppName(),
                 customAppIcon = securityManager.getCustomAppIcon(),
-                statusMessage = "App name & icon updated!"
+                statusMessage = "App Name & Icon updated!"
             )
         }
     }
 
-    fun changePasswords(oldMaster: String, newMaster: String, newSecondary: String, hint: String): Boolean {
-        val success = securityManager.updatePasswords(oldMaster, newMaster, newSecondary, hint)
+    fun changePin(oldPin: String, newPin: String, hint: String): Boolean {
+        val success = securityManager.updatePin(oldPin, newPin, hint)
         if (success) {
-            _uiState.update { it.copy(statusMessage = "Passwords updated successfully!") }
+            _uiState.update { it.copy(statusMessage = "Master PIN updated successfully!") }
             return true
         } else {
-            _uiState.update { it.copy(statusMessage = "Current Master Password was incorrect.") }
+            _uiState.update { it.copy(statusMessage = "Current Master PIN was incorrect.") }
             return false
         }
+    }
+
+    // Google Sign-In & Cloud Sync
+    fun onGoogleAuthSuccess() {
+        val user = firestoreSync.getCurrentUser()
+        _uiState.update {
+            it.copy(
+                userEmail = user?.email,
+                userDisplayName = user?.displayName,
+                statusMessage = "Signed in as ${user?.email ?: "Google User"}"
+            )
+        }
+        syncToCloud()
+    }
+
+    fun onGoogleSignOut() {
+        _uiState.update {
+            it.copy(
+                userEmail = null,
+                userDisplayName = null,
+                statusMessage = "Signed out from Google Account."
+            )
+        }
+    }
+
+    fun syncToCloud() {
+        if (!firestoreSync.isUserSignedIn()) {
+            _uiState.update { it.copy(statusMessage = "Sign in with Google to sync with Cloud Firestore.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCloudSyncing = true) }
+            val ok = firestoreSync.syncAllRecords(
+                sessions = _uiState.value.savedSessions,
+                calls = _uiState.value.calls,
+                sms = _uiState.value.sms,
+                whatsapp = _uiState.value.whatsapp
+            )
+            _uiState.update {
+                it.copy(
+                    isCloudSyncing = false,
+                    statusMessage = if (ok) "Cloud sync completed successfully!" else "Cloud sync failed. Check connection."
+                )
+            }
+        }
+    }
+
+    // Clear / Delete All Audit History (Locally and on Firestore)
+    fun clearAllAuditHistory() {
+        viewModelScope.launch {
+            securityManager.clearAllHistory()
+            if (firestoreSync.isUserSignedIn()) {
+                firestoreSync.deleteAllUserData()
+            }
+            _uiState.update {
+                it.copy(
+                    activeSession = null,
+                    savedSessions = emptyList(),
+                    calls = emptyList(),
+                    sms = emptyList(),
+                    whatsapp = emptyList(),
+                    statusMessage = "All history permanently deleted from local storage and Cloud Firestore."
+                )
+            }
+            refreshLogs()
+        }
+    }
+
+    fun updateBatteryOptimizationState() {
+        val ignored = DeviceOemHelper.isBatteryOptimizationIgnored(getApplication())
+        _uiState.update { it.copy(isBatteryOptimizationIgnored = ignored) }
     }
 
     fun clearStatusMessage() {

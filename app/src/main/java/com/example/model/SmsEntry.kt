@@ -4,10 +4,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class SmsType(val displayName: String, val urduLabel: String) {
-    SENT("Sent SMS", "Sent (Bheja gaya)"),
-    RECEIVED("Received SMS", "Received (Mausool hua)"),
-    DRAFT("Draft", "Draft")
+enum class SmsType(val displayName: String) {
+    SENT("Sent SMS"),
+    RECEIVED("Received SMS"),
+    DRAFT("Draft")
 }
 
 data class SmsEntry(

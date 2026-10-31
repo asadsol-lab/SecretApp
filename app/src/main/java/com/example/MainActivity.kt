@@ -3,7 +3,6 @@ package com.example
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -11,11 +10,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.AppScreen
@@ -28,11 +27,16 @@ import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SetupPasswordScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.Navy900
+import com.example.util.BiometricHelper
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+
+    private var auditViewModel: AuditViewModel? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             MyApplicationTheme {
                 Surface(
@@ -40,9 +44,10 @@ class MainActivity : ComponentActivity() {
                     color = Navy900
                 ) {
                     val viewModel: AuditViewModel = viewModel()
+                    auditViewModel = viewModel
                     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-                    // Permission launcher for Call Log and SMS
+                    // Permission launcher for Call Log, SMS, and Contacts
                     val permissionLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.RequestMultiplePermissions()
                     ) { permissions ->
@@ -51,7 +56,7 @@ class MainActivity : ComponentActivity() {
                         viewModel.updatePermissions(callGranted, smsGranted)
                     }
 
-                    // Check initial permissions
+                    // Check initial permissions on launch
                     LaunchedEffect(Unit) {
                         val callOk = ContextCompat.checkSelfPermission(
                             this@MainActivity,
@@ -64,6 +69,7 @@ class MainActivity : ComponentActivity() {
                         ) == PackageManager.PERMISSION_GRANTED
 
                         viewModel.updatePermissions(callOk, smsOk)
+                        viewModel.updateBatteryOptimizationState()
                     }
 
                     // Handle back button for sub-screens and auto-lock security
@@ -79,14 +85,16 @@ class MainActivity : ComponentActivity() {
                     when (uiState.currentScreen) {
                         AppScreen.ONBOARDING -> {
                             OnboardingScreen(
+                                oemInfo = uiState.oemDeviceInfo,
+                                isBatteryOptimizationIgnored = uiState.isBatteryOptimizationIgnored,
                                 onComplete = { viewModel.completeOnboarding() }
                             )
                         }
 
                         AppScreen.SETUP -> {
                             SetupPasswordScreen(
-                                onSetupComplete = { master, secondary, hint ->
-                                    viewModel.completeSetup(master, secondary, hint)
+                                onSetupComplete = { masterPin, hint ->
+                                    viewModel.completeSetup(masterPin, hint)
                                 },
                                 errorMessage = uiState.statusMessage
                             )
@@ -95,8 +103,15 @@ class MainActivity : ComponentActivity() {
                         AppScreen.LOCK -> {
                             LockScreen(
                                 customAppName = uiState.customAppName,
-                                onUnlock = { password ->
-                                    viewModel.unlockWithPassword(password)
+                                isBiometricEnabled = uiState.isBiometricEnabled,
+                                onUnlockWithPin = { pin ->
+                                    viewModel.unlockWithPin(pin)
+                                },
+                                onBiometricClick = {
+                                    promptBiometricUnlock(
+                                        appName = uiState.customAppName,
+                                        onSuccess = { viewModel.unlockWithBiometric() }
+                                    )
                                 },
                                 lockoutSeconds = uiState.lockoutSeconds,
                                 securityHint = uiState.securityHint,
@@ -166,13 +181,22 @@ class MainActivity : ComponentActivity() {
                                 onUpdateBranding = { name, iconKey ->
                                     viewModel.updateCustomBranding(name, iconKey)
                                 },
+                                userEmail = uiState.userEmail,
+                                userDisplayName = uiState.userDisplayName,
+                                isCloudSyncing = uiState.isCloudSyncing,
+                                onGoogleAuthSuccess = { viewModel.onGoogleAuthSuccess() },
+                                onGoogleSignOut = { viewModel.onGoogleSignOut() },
+                                onSyncNow = { viewModel.syncToCloud() },
+                                isBiometricEnabled = uiState.isBiometricEnabled,
+                                onToggleBiometric = { enabled -> viewModel.setBiometricEnabled(enabled) },
                                 isDemoDataEnabled = uiState.isDemoDataEnabled,
-                                onToggleDemoData = { enabled ->
-                                    viewModel.toggleDemoData(enabled)
+                                onToggleDemoData = { enabled -> viewModel.toggleDemoData(enabled) },
+                                onChangePin = { oldPin, newPin, hint ->
+                                    viewModel.changePin(oldPin, newPin, hint)
                                 },
-                                onChangePasswords = { oldMaster, newMaster, newSecondary, hint ->
-                                    viewModel.changePasswords(oldMaster, newMaster, newSecondary, hint)
-                                },
+                                onDeleteAllHistory = { viewModel.clearAllAuditHistory() },
+                                oemInfo = uiState.oemDeviceInfo,
+                                isBatteryOptimizationIgnored = uiState.isBatteryOptimizationIgnored,
                                 onBack = { viewModel.navigateTo(AppScreen.DASHBOARD) }
                             )
                         }
@@ -180,5 +204,29 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun promptBiometricUnlock(
+        appName: String,
+        onSuccess: () -> Unit
+    ) {
+        if (!BiometricHelper.isBiometricAvailable(this)) {
+            return
+        }
+
+        BiometricHelper.authenticateWithBiometrics(
+            activity = this,
+            title = "Unlock $appName",
+            subtitle = "Scan your fingerprint or face to access audit logs",
+            onSuccess = onSuccess,
+            onError = { /* fallback to PIN */ },
+            onFailed = { /* invalid biometric, prompt continues or fallbacks */ }
+        )
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Auto-lock when user leaves the app or switches to home screen
+        auditViewModel?.lockApp()
     }
 }

@@ -9,11 +9,6 @@ import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.UUID
 
-enum class VerifiedPasswordType {
-    MASTER_ADMIN,
-    SECONDARY_BACKUP
-}
-
 class SecurityManager(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("device_audit_security_prefs", Context.MODE_PRIVATE)
@@ -22,10 +17,12 @@ class SecurityManager(context: Context) {
         private const val KEY_SETUP_COMPLETED = "setup_completed"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_MASTER_HASH = "master_hash"
-        private const val KEY_SECONDARY_HASH = "secondary_hash"
         private const val KEY_SECURITY_HINT = "security_hint"
         private const val KEY_FAILED_ATTEMPTS = "failed_attempts"
         private const val KEY_LOCKOUT_TIMESTAMP = "lockout_timestamp"
+
+        // Biometric Setting
+        private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
 
         // Active Lending Session
         private const val KEY_ACTIVE_SESSION_ID = "active_session_id"
@@ -64,51 +61,38 @@ class SecurityManager(context: Context) {
         return prefs.getBoolean(KEY_SETUP_COMPLETED, false)
     }
 
-    fun setupPasswords(masterPass: String, secondaryPass: String, hint: String = ""): Boolean {
-        if (masterPass.isBlank() || secondaryPass.isBlank()) return false
-        if (masterPass == secondaryPass) return false // Must be two distinct passwords
+    fun setupPin(masterPin: String, hint: String = ""): Boolean {
+        if (masterPin.isBlank() || masterPin.length < 4) return false
 
-        val masterHash = hashPassword(masterPass)
-        val secondaryHash = hashPassword(secondaryPass)
+        val masterHash = hashPassword(masterPin)
 
         prefs.edit()
             .putBoolean(KEY_SETUP_COMPLETED, true)
             .putBoolean(KEY_ONBOARDING_COMPLETED, true)
             .putString(KEY_MASTER_HASH, masterHash)
-            .putString(KEY_SECONDARY_HASH, secondaryHash)
             .putString(KEY_SECURITY_HINT, hint)
+            .putBoolean(KEY_BIOMETRIC_ENABLED, true)
             .putInt(KEY_FAILED_ATTEMPTS, 0)
             .putLong(KEY_LOCKOUT_TIMESTAMP, 0L)
             .apply()
         return true
     }
 
-    fun updatePasswords(oldAuthPass: String, newMaster: String, newSecondary: String, hint: String = ""): Boolean {
-        val verified = verifyPassword(oldAuthPass)
-        if (verified != VerifiedPasswordType.MASTER_ADMIN) {
-            return false // Only master password can reconfigure passwords
-        }
-        return setupPasswords(newMaster, newSecondary, hint)
+    fun updatePin(oldPin: String, newPin: String, hint: String = ""): Boolean {
+        if (!verifyPin(oldPin)) return false
+        return setupPin(newPin, hint)
     }
 
-    fun verifyPassword(input: String): VerifiedPasswordType? {
+    fun verifyPin(input: String): Boolean {
         val inputHash = hashPassword(input)
         val masterHash = prefs.getString(KEY_MASTER_HASH, "") ?: ""
-        val secondaryHash = prefs.getString(KEY_SECONDARY_HASH, "") ?: ""
 
-        return when {
-            inputHash == masterHash && masterHash.isNotEmpty() -> {
-                resetFailedAttempts()
-                VerifiedPasswordType.MASTER_ADMIN
-            }
-            inputHash == secondaryHash && secondaryHash.isNotEmpty() -> {
-                resetFailedAttempts()
-                VerifiedPasswordType.SECONDARY_BACKUP
-            }
-            else -> {
-                recordFailedAttempt()
-                null
-            }
+        return if (inputHash == masterHash && masterHash.isNotEmpty()) {
+            resetFailedAttempts()
+            true
+        } else {
+            recordFailedAttempt()
+            false
         }
     }
 
@@ -138,6 +122,15 @@ class SecurityManager(context: Context) {
         return prefs.getString(KEY_SECURITY_HINT, "") ?: ""
     }
 
+    // Biometric Fingerprint
+    fun isBiometricEnabled(): Boolean {
+        return prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
+    }
+
     // Active Lending Session
     fun isSessionActive(): Boolean {
         return prefs.getLong(KEY_ACTIVE_START_TIME, 0L) > 0L
@@ -147,7 +140,7 @@ class SecurityManager(context: Context) {
         val startTime = prefs.getLong(KEY_ACTIVE_START_TIME, 0L)
         if (startTime <= 0L) return null
         val id = prefs.getString(KEY_ACTIVE_SESSION_ID, UUID.randomUUID().toString()) ?: ""
-        val borrower = prefs.getString(KEY_ACTIVE_BORROWER, "Guest / Friend") ?: "Guest"
+        val borrower = prefs.getString(KEY_ACTIVE_BORROWER, "Guest") ?: "Guest"
         return LendingSession(
             id = id,
             borrowerName = borrower,
@@ -241,7 +234,6 @@ class SecurityManager(context: Context) {
     // WhatsApp Notification Capture
     fun saveWhatsAppEntry(entry: WhatsAppEntry) {
         val existing = getWhatsAppLogs().toMutableList()
-        // Deduplicate recent identical messages
         if (existing.any { it.senderOrCaller == entry.senderOrCaller && it.body == entry.body && kotlin.math.abs(it.timestamp - entry.timestamp) < 3000 }) {
             return
         }
@@ -287,7 +279,18 @@ class SecurityManager(context: Context) {
         return list
     }
 
-    // Demo Data Toggle (Default: FALSE so new users see a clean fresh experience)
+    // Clear / Delete All Local History
+    fun clearAllHistory() {
+        prefs.edit()
+            .remove(KEY_ACTIVE_SESSION_ID)
+            .remove(KEY_ACTIVE_BORROWER)
+            .remove(KEY_ACTIVE_START_TIME)
+            .remove(KEY_SESSIONS_JSON)
+            .remove(KEY_WHATSAPP_LOGS_JSON)
+            .apply()
+    }
+
+    // Demo Data Toggle
     fun isDemoDataEnabled(): Boolean {
         return prefs.getBoolean(KEY_DEMO_DATA_ENABLED, false)
     }
@@ -296,7 +299,7 @@ class SecurityManager(context: Context) {
         prefs.edit().putBoolean(KEY_DEMO_DATA_ENABLED, enabled).apply()
     }
 
-    // Custom App Name and Icon (Stealth / Disguise / Personalization)
+    // Custom App Name and Icon
     fun getCustomAppName(): String {
         return prefs.getString(KEY_CUSTOM_APP_NAME, "Device Audit Log") ?: "Device Audit Log"
     }

@@ -63,7 +63,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.VerifiedPasswordType
 import com.example.model.AuditItem
 import com.example.model.CallType
 import com.example.ui.AuditUiState
@@ -145,13 +144,8 @@ fun DashboardScreen(
                                     color = Slate200
                                 )
                             )
-                            val userLabel = if (uiState.authenticatedUserType == VerifiedPasswordType.MASTER_ADMIN) {
-                                "Master Owner Access"
-                            } else {
-                                "Backup Password Access"
-                            }
                             Text(
-                                text = userLabel,
+                                text = "Master Owner Access",
                                 style = MaterialTheme.typography.labelSmall.copy(color = Cyan400),
                                 fontSize = 10.sp
                             )
@@ -243,7 +237,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Mobile ke live calls aur SMS read karne ke liye permissions ki zaroorat hai.",
+                                text = "Permissions are required to securely read real-time Call Logs and SMS.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = Slate400)
                             )
                             Spacer(modifier = Modifier.height(10.dp))
@@ -504,7 +498,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Is waqt ke doran koi call, SMS ya WhatsApp message record nahi hua. Jab phone kisi ko dein toh upar se 'Start Lending Session' shuru karein.",
+                                text = "No calls, SMS, or WhatsApp events were recorded during this timeframe. Tap 'Start Lending Session' when letting someone use your phone.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
                                 textAlign = TextAlign.Center
                             )

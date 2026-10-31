@@ -4,12 +4,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class CallType(val displayName: String, val urduLabel: String) {
-    OUTGOING("Outgoing Call", "Outgoing (Call ki gayi)"),
-    INCOMING("Incoming Call", "Incoming (Call aayi)"),
-    MISSED("Missed Call", "Missed Call"),
-    REJECTED("Rejected Call", "Rejected Call"),
-    UNKNOWN("Unknown", "Ghair Maloom")
+enum class CallType(val displayName: String) {
+    OUTGOING("Outgoing Call"),
+    INCOMING("Incoming Call"),
+    MISSED("Missed Call"),
+    REJECTED("Rejected Call"),
+    UNKNOWN("Unknown Call")
 }
 
 data class CallEntry(

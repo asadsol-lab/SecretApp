@@ -1,6 +1,6 @@
 {
   "name": "Device Audit Log",
-  "description": "Dual-password protected audit tool to monitor calls and SMS activity when lending your phone.",
+  "description": "Secure device lending activity auditor with PIN lock, biometric fingerprint, Google login, and Cloud Firestore sync.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

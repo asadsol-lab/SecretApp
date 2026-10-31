@@ -3,12 +3,10 @@ package com.example
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.SecurityManager
-import com.example.data.VerifiedPasswordType
 import com.example.model.WhatsAppEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,26 +25,40 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `test dual password security setup and verification`() {
+    fun `test single master pin setup and verification`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val securityManager = SecurityManager(context)
 
-        // Setup passwords
-        val setupResult = securityManager.setupPasswords("Admin@1234", "Backup#5678", "School name")
+        // Setup PIN
+        val setupResult = securityManager.setupPin("1234", "Favorite year")
         assertTrue(setupResult)
         assertTrue(securityManager.isSetupCompleted())
 
-        // Verify with Master password
-        val masterVerified = securityManager.verifyPassword("Admin@1234")
-        assertEquals(VerifiedPasswordType.MASTER_ADMIN, masterVerified)
+        // Verify with correct PIN
+        val verified = securityManager.verifyPin("1234")
+        assertTrue(verified)
 
-        // Verify with Backup password
-        val backupVerified = securityManager.verifyPassword("Backup#5678")
-        assertEquals(VerifiedPasswordType.SECONDARY_BACKUP, backupVerified)
+        // Verify wrong PIN fails
+        val wrongVerified = securityManager.verifyPin("9999")
+        assertFalse(wrongVerified)
 
-        // Verify wrong password fails
-        val wrongVerified = securityManager.verifyPassword("WrongPassword")
-        assertNull(wrongVerified)
+        // Verify update PIN
+        val updateOk = securityManager.updatePin("1234", "5678", "New hint")
+        assertTrue(updateOk)
+        assertTrue(securityManager.verifyPin("5678"))
+        assertFalse(securityManager.verifyPin("1234"))
+    }
+
+    @Test
+    fun `test biometric settings toggle`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val securityManager = SecurityManager(context)
+
+        securityManager.setBiometricEnabled(true)
+        assertTrue(securityManager.isBiometricEnabled())
+
+        securityManager.setBiometricEnabled(false)
+        assertFalse(securityManager.isBiometricEnabled())
     }
 
     @Test
@@ -80,7 +92,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `test whatsapp notification storage`() {
+    fun `test whatsapp notification storage and clearing`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val securityManager = SecurityManager(context)
 
@@ -96,5 +108,11 @@ class ExampleRobolectricTest {
         securityManager.saveWhatsAppEntry(entry)
         val logs = securityManager.getWhatsAppLogs()
         assertTrue(logs.any { it.senderOrCaller == "Ali WhatsApp" && it.body == "Meeting at 4pm" })
+
+        // Test clear history
+        securityManager.clearAllHistory()
+        val clearedLogs = securityManager.getWhatsAppLogs()
+        assertTrue(clearedLogs.isEmpty())
+        assertFalse(securityManager.isSessionActive())
     }
 }

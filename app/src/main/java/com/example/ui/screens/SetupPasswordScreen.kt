@@ -22,7 +22,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
@@ -54,7 +53,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.Cyan400
-import com.example.ui.theme.Emerald400
 import com.example.ui.theme.Navy700
 import com.example.ui.theme.Navy800
 import com.example.ui.theme.Navy900
@@ -64,17 +62,14 @@ import com.example.ui.theme.Slate400
 
 @Composable
 fun SetupPasswordScreen(
-    onSetupComplete: (masterPass: String, secondaryPass: String, hint: String) -> Unit,
+    onSetupComplete: (masterPin: String, hint: String) -> Unit,
     errorMessage: String?
 ) {
-    var masterPassword by remember { mutableStateOf("") }
-    var confirmMaster by remember { mutableStateOf("") }
-    var secondaryPassword by remember { mutableStateOf("") }
-    var confirmSecondary by remember { mutableStateOf("") }
+    var masterPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
     var securityHint by remember { mutableStateOf("") }
 
-    var showMasterPass by remember { mutableStateOf(false) }
-    var showSecondaryPass by remember { mutableStateOf(false) }
+    var showPin by remember { mutableStateOf(false) }
     var localError by remember { mutableStateOf<String?>(null) }
 
     val scrollState = rememberScrollState()
@@ -91,15 +86,15 @@ fun SetupPasswordScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Security Shield Icon
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(76.dp)
                     .background(Navy700, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -107,14 +102,14 @@ fun SetupPasswordScreen(
                     imageVector = Icons.Default.Security,
                     contentDescription = "Security Shield",
                     tint = Cyan400,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(42.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "Dual-Password Setup",
+                text = "Set Up Master Security PIN",
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold,
                     color = Slate200
@@ -123,7 +118,7 @@ fun SetupPasswordScreen(
             )
 
             Text(
-                text = "Owner Protection • 2 Alag Passwords",
+                text = "Owner Protection • Device Audit Access",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     color = Cyan400,
                     fontWeight = FontWeight.Medium
@@ -131,10 +126,10 @@ fun SetupPasswordScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "App kholne ke liye 2 passwords set karein. Fingerprint option band hai taake sirf owner password se khul sake.",
+                text = "Choose a secure Master PIN (4+ digits). You can also enable biometric fingerprint unlock once this PIN is set.",
                 style = MaterialTheme.typography.bodySmall.copy(
                     color = Slate400,
                     lineHeight = 18.sp
@@ -143,7 +138,7 @@ fun SetupPasswordScreen(
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Error display
             val displayError = localError ?: errorMessage
@@ -153,7 +148,7 @@ fun SetupPasswordScreen(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp)
+                        .padding(bottom = 14.dp)
                 ) {
                     Text(
                         text = displayError,
@@ -165,13 +160,13 @@ fun SetupPasswordScreen(
                 }
             }
 
-            // Section 1: Master Admin Password
+            // Master PIN Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = Navy800),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(18.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -180,13 +175,13 @@ fun SetupPasswordScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
-                                contentDescription = "Master Password",
+                                contentDescription = "Master PIN",
                                 tint = Cyan400,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "1. Master Admin Password",
+                                text = "Master Security PIN",
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     color = Slate200
@@ -195,11 +190,11 @@ fun SetupPasswordScreen(
                         }
 
                         IconButton(
-                            onClick = { showMasterPass = !showMasterPass },
+                            onClick = { showPin = !showPin },
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
-                                imageVector = if (showMasterPass) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                imageVector = if (showPin) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                 contentDescription = "Toggle Visibility",
                                 tint = Cyan400,
                                 modifier = Modifier.size(18.dp)
@@ -207,14 +202,16 @@ fun SetupPasswordScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     OutlinedTextField(
-                        value = masterPassword,
-                        onValueChange = { masterPassword = it; localError = null },
-                        label = { Text("Enter Master Password") },
-                        visualTransformation = if (showMasterPass) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                        value = masterPin,
+                        onValueChange = { masterPin = it; localError = null },
+                        label = { Text("Enter Master PIN") },
+                        placeholder = { Text("e.g. 8492") },
+                        singleLine = true,
+                        visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Next),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Cyan400,
                             unfocusedBorderColor = Navy700,
@@ -223,17 +220,19 @@ fun SetupPasswordScreen(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("master_password_input")
+                            .testTag("master_pin_input")
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
-                        value = confirmMaster,
-                        onValueChange = { confirmMaster = it; localError = null },
-                        label = { Text("Confirm Master Password") },
-                        visualTransformation = if (showMasterPass) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                        value = confirmPin,
+                        onValueChange = { confirmPin = it; localError = null },
+                        label = { Text("Confirm Master PIN") },
+                        placeholder = { Text("Re-enter Master PIN") },
+                        singleLine = true,
+                        visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Next),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Cyan400,
                             unfocusedBorderColor = Navy700,
@@ -242,103 +241,20 @@ fun SetupPasswordScreen(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("confirm_master_input")
+                            .testTag("confirm_pin_input")
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Section 2: Secondary / Backup Password
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Navy800),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Key,
-                                contentDescription = "Secondary Password",
-                                tint = Emerald400,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "2. Secondary Backup Password",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Slate200
-                                )
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { showSecondaryPass = !showSecondaryPass },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (showSecondaryPass) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = "Toggle Visibility",
-                                tint = Emerald400,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = secondaryPassword,
-                        onValueChange = { secondaryPassword = it; localError = null },
-                        label = { Text("Enter Backup Password") },
-                        visualTransformation = if (showSecondaryPass) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Emerald400,
-                            unfocusedBorderColor = Navy700,
-                            focusedTextColor = Slate200,
-                            unfocusedTextColor = Slate200
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("secondary_password_input")
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedTextField(
-                        value = confirmSecondary,
-                        onValueChange = { confirmSecondary = it; localError = null },
-                        label = { Text("Confirm Backup Password") },
-                        visualTransformation = if (showSecondaryPass) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Emerald400,
-                            unfocusedBorderColor = Navy700,
-                            focusedTextColor = Slate200,
-                            unfocusedTextColor = Slate200
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("confirm_secondary_input")
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Section 3: Password Hint
+            // Security Hint Card
             OutlinedTextField(
                 value = securityHint,
                 onValueChange = { securityHint = it },
-                label = { Text("Password Hint (Optional)") },
-                placeholder = { Text("e.g., Favorite school name") },
+                label = { Text("PIN Recovery Hint (Optional)") },
+                placeholder = { Text("e.g. Favorite street number") },
+                singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { }),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -352,19 +268,16 @@ fun SetupPasswordScreen(
                     .testTag("hint_input")
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
                     when {
-                        masterPassword.length < 4 -> localError = "Master password must be at least 4 characters long."
-                        masterPassword != confirmMaster -> localError = "Master passwords do not match."
-                        secondaryPassword.length < 4 -> localError = "Backup password must be at least 4 characters long."
-                        secondaryPassword != confirmSecondary -> localError = "Backup passwords do not match."
-                        masterPassword == secondaryPassword -> localError = "Master and Backup passwords must be completely different."
+                        masterPin.length < 4 -> localError = "PIN must be at least 4 digits long."
+                        masterPin != confirmPin -> localError = "PINs do not match. Please re-enter."
                         else -> {
                             localError = null
-                            onSetupComplete(masterPassword, secondaryPassword, securityHint)
+                            onSetupComplete(masterPin, securityHint)
                         }
                     }
                 },
@@ -373,15 +286,14 @@ fun SetupPasswordScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .testTag("save_passwords_button")
+                    .testTag("save_pin_button")
             ) {
                 Text(
-                    text = "Save Dual Passwords & Secure App",
+                    text = "Save Master PIN & Unlock",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
             }
 
-            // Generous bottom spacer so keyboard NEVER cuts off fields or buttons
             Spacer(modifier = Modifier.height(140.dp))
         }
     }

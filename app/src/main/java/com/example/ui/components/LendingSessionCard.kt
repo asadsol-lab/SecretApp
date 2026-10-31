@@ -40,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.LendingSession
-import com.example.ui.theme.Amber500
 import com.example.ui.theme.CardDark
 import com.example.ui.theme.Cyan400
 import com.example.ui.theme.Emerald400
@@ -107,7 +106,7 @@ fun LendingSessionCard(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Mobile given to: ${activeSession.borrowerName}",
+                    text = "Lent to: ${activeSession.borrowerName}",
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold,
                         color = Slate200
@@ -121,7 +120,6 @@ fun LendingSessionCard(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Current session counts
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -169,14 +167,14 @@ fun LendingSessionCard(
                     Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Phone Wapas Mil Gaya? End & Audit",
+                        text = "Phone Returned? End & Audit",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                 }
             }
         }
     } else {
-        // Idle Session: Option to Start
+        // Idle Session
         var borrowerNameInput by remember { mutableStateOf("") }
         var isExpanded by remember { mutableStateOf(false) }
 
@@ -210,14 +208,14 @@ fun LendingSessionCard(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Lending Mobile to Someone?",
+                            text = "Lending Phone to Someone?",
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Slate200
                             )
                         )
                         Text(
-                            text = "Start tracking before handing over your phone",
+                            text = "Start tracking before handing over your device",
                             style = MaterialTheme.typography.bodySmall.copy(color = Slate400)
                         )
                     }
@@ -229,8 +227,8 @@ fun LendingSessionCard(
                     OutlinedTextField(
                         value = borrowerNameInput,
                         onValueChange = { borrowerNameInput = it },
-                        label = { Text("Person's Name / Label") },
-                        placeholder = { Text("e.g. Asif (Friend), Cousin, Office Colleague") },
+                        label = { Text("Person's Name or Note") },
+                        placeholder = { Text("e.g. Alex (Friend), Coworker, Cousin") },
                         singleLine = true,
                         leadingIcon = {
                             Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = Slate400)
@@ -268,7 +266,7 @@ fun LendingSessionCard(
                             Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Start Session Now",
+                                text = "Start Session",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
@@ -297,7 +295,7 @@ fun LendingSessionCard(
                         Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Start Lending Session (Kisi ko phone dene se pehle)",
+                            text = "Start Lending Session",
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                         )
                     }

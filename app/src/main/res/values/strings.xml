@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Device Audit Log</string>
-    <string name="security_tagline">Dual-Password Phone Lending Auditor</string>
+    <string name="security_tagline">Device Lending &amp; Activity Auditor</string>
+    <string name="firestore_database_id">(default)</string>
 </resources>

@@ -104,7 +104,7 @@ fun ActivityDetailDialog(
                         val call = item.entry
                         DetailRow("Contact / Name", call.cachedName ?: "Not in Contacts")
                         DetailRow("Phone Number", call.number)
-                        DetailRow("Call Type", "${call.type.displayName} (${call.type.urduLabel})")
+                        DetailRow("Call Type", call.type.displayName)
                         DetailRow("Timestamp", call.formattedTime)
                         DetailRow("Duration (Talk Time)", call.formattedDuration)
 
@@ -116,7 +116,7 @@ fun ActivityDetailDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Ye call record phone ke Call Log se liya gaya hai. Owner ke password ke baghair ise delete ya chupa nahi ja sakta.",
+                                text = "This call record is captured from the system Call Log. It is securely encrypted and cannot be modified or hidden without Master PIN verification.",
                                 color = Slate400,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(12.dp)
@@ -126,7 +126,7 @@ fun ActivityDetailDialog(
                     is AuditItem.Sms -> {
                         val sms = item.entry
                         DetailRow("Contact / Address", sms.cachedName ?: sms.address)
-                        DetailRow("Type", "${sms.type.displayName} (${sms.type.urduLabel})")
+                        DetailRow("Type", sms.type.displayName)
                         DetailRow("Timestamp", sms.formattedTime)
 
                         Spacer(modifier = Modifier.height(10.dp))
@@ -188,7 +188,7 @@ fun ActivityDetailDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "WhatsApp activity Android Notification Listener API ke zariye capture hoti hai jo 100% Android privacy policy ke mutabiq hai.",
+                                text = "WhatsApp activity is captured strictly via Android Notification Listener API in full compliance with Android privacy and permission guidelines.",
                                 color = Slate400,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(12.dp)

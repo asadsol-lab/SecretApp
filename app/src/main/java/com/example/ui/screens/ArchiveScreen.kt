@@ -35,6 +35,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -114,7 +115,7 @@ fun ArchiveScreen(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "Jab aap kisi ko mobile dete waqt session start karein ge aur baad mein end karein ge, toh unka mukammal audit report yahan save ho jayega.",
+                        text = "When you start and end a lending session, detailed audit reports will be preserved here and backed up to Cloud Firestore.",
                         style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
                         textAlign = TextAlign.Center
                     )
@@ -210,6 +211,11 @@ fun ArchiveScreen(
                                 Text(
                                     text = "SMS: ${session.smsRecordedCount}",
                                     color = Emerald400,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                                Text(
+                                    text = "WhatsApp: ${session.whatsappRecordedCount}",
+                                    color = Color(0xFF25D366),
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
                                 )
                             }

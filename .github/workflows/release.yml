@@ -36,7 +36,7 @@ jobs:
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
           if [ ! -f app/google-services.json ]; then
-            echo '{"project_info":{"project_number":"000000000000","project_id":"device-audit","storage_bucket":""},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"com.example"}},"oauth_client":[],"api_key":[{"current_key":""}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}]}' > app/google-services.json
+            echo '{"project_info":{"project_number":"374231705551","project_id":"device-audit-logs","storage_bucket":""},"client":[{"client_info":{"mobilesdk_app_id":"1:374231705551:android:e846bfe4","android_client_info":{"package_name":"audit.log.khanioo"}},"oauth_client":[],"api_key":[{"current_key":""}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}]}' > app/google-services.json
           fi
 
       - name: Grant Execute Permission for Gradlew
@@ -48,19 +48,25 @@ jobs:
       - name: Rename APK for Release
         run: |
           mkdir -p release_apks
-          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} release_apks/DeviceAuditLog-v1.0.apk \;
+          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} release_apks/DeviceAuditLog-v1.1.apk \;
           ls -la release_apks/
 
       - name: Create GitHub Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: "Device Audit Log v1.0 (Build ${{ github.run_number }})"
+          tag_name: v1.1.${{ github.run_number }}
+          name: "Device Audit Log v1.1 (Build ${{ github.run_number }})"
           body: |
-            ### Device Audit Log - Release Build
-            - Dual-password protected phone activity and call/SMS lending auditor.
+            ### Device Audit Log v1.1 - Release Build
+            - Single Master PIN owner protection (2nd password removed).
+            - Biometric / Fingerprint authentication unlock.
+            - Google Sign-In with Firebase Authentication & Cloud Firestore free database sync.
+            - All Call Logs, SMS records, and WhatsApp activity securely audited and synchronized.
+            - Auto-lock on app exit and Back button navigation.
+            - Permanent delete option (erases local device database & Cloud Firestore data).
+            - Device OEM battery optimization detection (Samsung, Xiaomi, Oppo, Vivo, OnePlus).
+            - 100% English interface with soft keyboard `imePadding()`.
             - Ready-to-install Android APK attached below.
-            - Download `DeviceAuditLog-v1.0.apk` to install directly on your device.
           files: release_apks/*.apk
           draft: false
           prerelease: false

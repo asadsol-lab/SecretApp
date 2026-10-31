@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "374231705551",
+    "project_id": "device-audit-logs",
+    "storage_bucket": "device-audit-logs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:374231705551:android:f74f03afba9ea7f39714ba",
+        "android_client_info": {
+          "package_name": "audit.log.khanioo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "374231705551-9negdlo9e4f5h68o4vva4hj3ec9umvk3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMzh71BZpNMca5MjG3ckwmZYwzOMI8jqc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "374231705551-9negdlo9e4f5h68o4vva4hj3ec9umvk3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

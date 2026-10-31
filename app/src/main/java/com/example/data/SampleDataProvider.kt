@@ -74,7 +74,7 @@ object SampleDataProvider {
                 id = 201L,
                 address = "+92 301 5550192",
                 cachedName = "Ahmed Khan",
-                body = "Mein ne files send kar di hain, check kar lena.",
+                body = "I have emailed the files, please review them.",
                 type = SmsType.SENT,
                 timestamp = now - (15 * 60 * 1000L) // 15 mins ago
             ),
@@ -82,7 +82,7 @@ object SampleDataProvider {
                 id = 202L,
                 address = "+92 301 5550192",
                 cachedName = "Ahmed Khan",
-                body = "Theek hai bhai, shukriya!",
+                body = "Sounds good, thanks a lot!",
                 type = SmsType.RECEIVED,
                 timestamp = now - (14 * 60 * 1000L) // 14 mins ago
             ),
@@ -98,7 +98,7 @@ object SampleDataProvider {
                 id = 204L,
                 address = "+92 333 4441234",
                 cachedName = "Zainab Ali",
-                body = "Location share kar do please.",
+                body = "Please share the meeting location with me.",
                 type = SmsType.RECEIVED,
                 timestamp = now - (3 * 60 * 60 * 1000L) // 3 hours ago
             ),
@@ -106,7 +106,7 @@ object SampleDataProvider {
                 id = 205L,
                 address = "+92 333 4441234",
                 cachedName = "Zainab Ali",
-                body = "Main abhi bhejta hoon.",
+                body = "Sending it to you right now.",
                 type = SmsType.SENT,
                 timestamp = now - (2 * 60 * 60 * 1000L + 55 * 60 * 1000L)
             )
