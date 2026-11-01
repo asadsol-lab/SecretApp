@@ -18,14 +18,25 @@ class WhatsAppNotificationListener : NotificationListenerService() {
         }
 
         val extras = sbn.notification.extras ?: return
-        val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        val title = (extras.getCharSequence(Notification.EXTRA_TITLE)
+            ?: extras.getString(Notification.EXTRA_TITLE)
+            ?: extras.getCharSequence("android.title.big")
+            ?: "").toString()
+
+        val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+            ?: extras.getCharSequence(Notification.EXTRA_TEXT)
+            ?: extras.getCharSequence(Notification.EXTRA_INFO_TEXT)
+            ?: extras.getCharSequence(Notification.EXTRA_SUB_TEXT)
+            ?: "").toString()
 
         if (title.isBlank() && text.isBlank()) return
 
-        val isCall = title.contains("call", ignoreCase = true) ||
+        val isCall = sbn.notification.category == Notification.CATEGORY_CALL ||
+                title.contains("call", ignoreCase = true) ||
                 text.contains("incoming call", ignoreCase = true) ||
-                text.contains("missed call", ignoreCase = true)
+                text.contains("missed call", ignoreCase = true) ||
+                text.contains("voice call", ignoreCase = true) ||
+                text.contains("video call", ignoreCase = true)
 
         val entry = WhatsAppEntry(
             id = System.currentTimeMillis() + sbn.id,
