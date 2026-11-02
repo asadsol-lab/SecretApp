@@ -37,6 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -100,7 +101,8 @@ fun DashboardScreen(
     onLockApp: () -> Unit,
     onOpenArchive: () -> Unit,
     onOpenSettings: () -> Unit,
-    onRequestPermissions: () -> Unit
+    onRequestPermissions: () -> Unit,
+    onLoadFullHistory: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -552,6 +554,98 @@ fun DashboardScreen(
                                 whatsapp = item.entry,
                                 onClick = { onItemClick(item) }
                             )
+                        }
+                    }
+                }
+            }
+
+            // Older Records Load Option
+            if (combinedItems.isNotEmpty()) {
+                if (!uiState.isFullHistoryMode) {
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CardDark),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Looking for Older History?",
+                                    color = Slate200,
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Showing the most recent 200 records for fast speed. Tap below to scan and load full older history.",
+                                    color = Slate400,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = onLoadFullHistory,
+                                    enabled = !uiState.isLoadingFullHistory,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Cyan400, contentColor = Navy900),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("load_full_history_button")
+                                ) {
+                                    if (uiState.isLoadingFullHistory) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            color = Navy900,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Scanning Older Records...")
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.History,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Load Full Older History", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                } else {
+                    item {
+                        Surface(
+                            color = Emerald400.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Emerald400,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Complete History Mode Active (${combinedItems.size} Total Records)",
+                                    color = Emerald400,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
+                                )
+                            }
                         }
                     }
                 }

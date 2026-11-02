@@ -25,8 +25,11 @@ class SecurityManager(context: Context) {
         private const val KEY_FAILED_ATTEMPTS = "failed_attempts"
         private const val KEY_LOCKOUT_TIMESTAMP = "lockout_timestamp"
 
-        // Biometric Setting
+        // Biometric Setting (default false until explicitly enabled in settings)
         private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
+
+        // Auto-Lock on back press / exit
+        private const val KEY_AUTOLOCK_ON_BACK = "autolock_on_back"
 
         // Active Lending Session
         private const val KEY_ACTIVE_SESSION_ID = "active_session_id"
@@ -80,7 +83,8 @@ class SecurityManager(context: Context) {
             .putBoolean(KEY_ONBOARDING_COMPLETED, true)
             .putString(KEY_MASTER_HASH, masterHash)
             .putString(KEY_SECURITY_HINT, hint)
-            .putBoolean(KEY_BIOMETRIC_ENABLED, true)
+            .putBoolean(KEY_BIOMETRIC_ENABLED, false)
+            .putBoolean(KEY_AUTOLOCK_ON_BACK, true)
             .putInt(KEY_FAILED_ATTEMPTS, 0)
             .putLong(KEY_LOCKOUT_TIMESTAMP, 0L)
             .apply()
@@ -131,13 +135,22 @@ class SecurityManager(context: Context) {
         return prefs.getString(KEY_SECURITY_HINT, "") ?: ""
     }
 
-    // Biometric Fingerprint
+    // Biometric Fingerprint (only active if user turns it on in settings)
     fun isBiometricEnabled(): Boolean {
-        return prefs.getBoolean(KEY_BIOMETRIC_ENABLED, true)
+        return prefs.getBoolean(KEY_BIOMETRIC_ENABLED, false)
     }
 
     fun setBiometricEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
+    }
+
+    // Auto-Lock on back press / exit
+    fun isAutoLockOnBackEnabled(): Boolean {
+        return prefs.getBoolean(KEY_AUTOLOCK_ON_BACK, true)
+    }
+
+    fun setAutoLockOnBackEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTOLOCK_ON_BACK, enabled).apply()
     }
 
     // Active Lending Session
@@ -289,7 +302,7 @@ class SecurityManager(context: Context) {
     }
 
     // Persistent Calls Management
-    fun saveCalls(newCalls: List<CallEntry>) {
+    fun saveCalls(newCalls: List<CallEntry>, maxLimit: Int = 500) {
         if (newCalls.isEmpty()) return
         val existing = getSavedCalls(0L).toMutableList()
         val existingIds = existing.map { it.id }.toHashSet()
@@ -308,7 +321,7 @@ class SecurityManager(context: Context) {
 
         if (addedCount == 0) return
 
-        val sorted = existing.sortedByDescending { it.timestamp }.take(250)
+        val sorted = existing.sortedByDescending { it.timestamp }.take(maxLimit)
         val jsonArray = JSONArray()
         for (c in sorted) {
             val obj = JSONObject().apply {
@@ -359,7 +372,7 @@ class SecurityManager(context: Context) {
     }
 
     // Persistent SMS Management
-    fun saveSms(newSms: List<SmsEntry>) {
+    fun saveSms(newSms: List<SmsEntry>, maxLimit: Int = 500) {
         if (newSms.isEmpty()) return
         val existing = getSavedSms(0L).toMutableList()
         val existingIds = existing.map { it.id }.toHashSet()
@@ -378,7 +391,7 @@ class SecurityManager(context: Context) {
 
         if (addedCount == 0) return
 
-        val sorted = existing.sortedByDescending { it.timestamp }.take(250)
+        val sorted = existing.sortedByDescending { it.timestamp }.take(maxLimit)
         val jsonArray = JSONArray()
         for (s in sorted) {
             val obj = JSONObject().apply {

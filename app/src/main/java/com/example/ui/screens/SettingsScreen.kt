@@ -122,6 +122,8 @@ fun SettingsScreen(
     onSyncNow: () -> Unit,
     isBiometricEnabled: Boolean,
     onToggleBiometric: (Boolean) -> Unit,
+    isAutoLockOnBack: Boolean = true,
+    onToggleAutoLock: (Boolean) -> Unit = {},
     isDemoDataEnabled: Boolean,
     onToggleDemoData: (Boolean) -> Unit,
     onChangePin: (oldPin: String, newPin: String, hint: String) -> Boolean,
@@ -388,6 +390,47 @@ fun SettingsScreen(
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Navy900,
                                 checkedTrackColor = Emerald400,
+                                uncheckedThumbColor = Slate400,
+                                uncheckedTrackColor = Navy700
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Auto-Lock on Exit / Back Press Setting
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(Cyan400.copy(alpha = 0.15f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = Cyan400,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("Auto-Lock on Back / Exit", color = Slate200, style = MaterialTheme.typography.titleSmall)
+                                Text("Lock app with PIN whenever you press Back or exit", color = Slate400, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
+                            }
+                        }
+
+                        Switch(
+                            checked = isAutoLockOnBack,
+                            onCheckedChange = onToggleAutoLock,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Navy900,
+                                checkedTrackColor = Cyan400,
                                 uncheckedThumbColor = Slate400,
                                 uncheckedTrackColor = Navy700
                             )

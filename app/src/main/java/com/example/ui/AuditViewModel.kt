@@ -55,7 +55,10 @@ data class AuditUiState(
     val isAuthenticated: Boolean = false,
     val lockoutSeconds: Long = 0L,
     val securityHint: String = "",
-    val isBiometricEnabled: Boolean = true,
+    val isBiometricEnabled: Boolean = false,
+    val isAutoLockOnBack: Boolean = true,
+    val isFullHistoryMode: Boolean = false,
+    val isLoadingFullHistory: Boolean = false,
     val activeSession: LendingSession? = null,
     val savedSessions: List<LendingSession> = emptyList(),
     val calls: List<CallEntry> = emptyList(),
@@ -133,6 +136,7 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
                 customAppName = customName,
                 customAppIcon = customIcon,
                 isBiometricEnabled = biometricEnabled,
+                isAutoLockOnBack = securityManager.isAutoLockOnBackEnabled(),
                 userEmail = currentUser?.email,
                 userDisplayName = currentUser?.displayName,
                 isBatteryOptimizationIgnored = batteryIgnored,
@@ -355,6 +359,48 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(isBiometricEnabled = enabled) }
     }
 
+    fun setAutoLockOnBack(enabled: Boolean) {
+        securityManager.setAutoLockOnBackEnabled(enabled)
+        _uiState.update { it.copy(isAutoLockOnBack = enabled) }
+    }
+
+    fun loadFullHistory() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isLoadingFullHistory = true) }
+            try {
+                val hasCallPerm = NotificationHelper.isCallLogPermissionGranted(getApplication())
+                val hasSmsPerm = NotificationHelper.isSmsPermissionGranted(getApplication())
+
+                if (hasCallPerm) {
+                    val fullCalls = callRepo.getCallLogs(0L, limit = 1000)
+                    securityManager.saveCalls(fullCalls, maxLimit = 1000)
+                }
+
+                if (hasSmsPerm) {
+                    val fullSms = smsRepo.getSmsLogs(0L, limit = 1000)
+                    securityManager.saveSms(fullSms, maxLimit = 1000)
+                }
+
+                val savedCalls = securityManager.getSavedCalls(0L)
+                val savedSms = securityManager.getSavedSms(0L)
+                val savedWhatsApp = securityManager.getWhatsAppLogs(0L)
+
+                _uiState.update {
+                    it.copy(
+                        calls = savedCalls,
+                        sms = savedSms,
+                        whatsapp = savedWhatsApp,
+                        isFullHistoryMode = true,
+                        isLoadingFullHistory = false,
+                        statusMessage = "Loaded all available history (${savedCalls.size} calls, ${savedSms.size} SMS)"
+                    )
+                }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isLoadingFullHistory = false) }
+            }
+        }
+    }
+
     fun updateCustomBranding(name: String, iconKey: String) {
         securityManager.setCustomAppName(name)
         securityManager.setCustomAppIcon(iconKey)
@@ -501,25 +547,26 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            // 1. Ingest available device logs in background (max 200 items to avoid ANRs)
+            // 1. Ingest available device logs in background (latest calls & SMS to avoid missing any activity)
             if (hasCallPerm) {
                 try {
-                    val liveCalls = callRepo.getCallLogs(sinceTimestamp, limit = 200)
+                    val liveCalls = callRepo.getCallLogs(0L, limit = 200)
                     securityManager.saveCalls(liveCalls)
                 } catch (_: Exception) {}
             }
 
             if (hasSmsPerm) {
                 try {
-                    val liveSms = smsRepo.getSmsLogs(sinceTimestamp, limit = 200)
+                    val liveSms = smsRepo.getSmsLogs(0L, limit = 200)
                     securityManager.saveSms(liveSms)
                 } catch (_: Exception) {}
             }
 
             // 2. Query persistent internal storage (includes live + historic logs)
-            val savedCalls = securityManager.getSavedCalls(sinceTimestamp)
-            val savedSms = securityManager.getSavedSms(sinceTimestamp)
-            val savedWhatsApp = securityManager.getWhatsAppLogs(sinceTimestamp)
+            val effectiveSince = if (_uiState.value.isFullHistoryMode) 0L else sinceTimestamp
+            val savedCalls = securityManager.getSavedCalls(effectiveSince)
+            val savedSms = securityManager.getSavedSms(effectiveSince)
+            val savedWhatsApp = securityManager.getWhatsAppLogs(effectiveSince)
 
             _uiState.update {
                 it.copy(

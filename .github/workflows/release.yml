@@ -50,26 +50,39 @@ jobs:
       - name: Rename APK for Release
         run: |
           mkdir -p release_apks
-          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} release_apks/DeviceAuditLog-v1.3.apk \;
+          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} release_apks/DeviceAuditLog-v1.4.apk \;
           ls -la release_apks/
 
       - name: Create GitHub Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.3.${{ github.run_number }}
-          name: "Device Audit Log v1.3 (Build ${{ github.run_number }})"
+          tag_name: v1.4.${{ github.run_number }}
+          name: "Device Audit Log v1.4 (Build ${{ github.run_number }})"
           body: |
-            ### Device Audit Log v1.3 - Performance & Stability Release
-            - Fixed ANR (App Not Responding) crash on devices with huge call/SMS history: all queries and JSON serialization moved to background `Dispatchers.IO` with 200-item query limits and shared contact name caching.
-            - Fixed screen navigation race condition: when Master PIN is configured, app deterministically displays the Lock screen and prevents Onboarding/Setup from reappearing.
-            - Instant, lag-free app launch and responsive UI.
-            - Reactive Notification Access banner with 1-tap launcher to enable WhatsApp auditing.
-            - Single Master PIN protection, Biometric Fingerprint unlock, and Google Cloud Firestore backup sync.
-            - Device OEM battery optimization detection (Samsung, Xiaomi, Oppo, Vivo, OnePlus).
-            - 100% English interface with soft keyboard `imePadding()`.
-            - Ready-to-install Android APK attached below.
+            ### Device Audit Log v1.4 - Optimized Size & Stability Release
+            - App size optimized: unused dependencies removed & resource packaging deduplicated.
+            - Real-time ContentObserver: instant call & SMS capture so no activity is ever missed.
+            - Load Older History Option: default 200 records for maximum responsiveness, with "Load Full Older History" option.
+            - PIN-first security: Biometric Fingerprint is disabled by default until user explicitly turns it ON in Settings.
+            - Auto-Lock on Back / Exit user setting: customizable in Settings.
+            - Automatic Release pruning: keeping only the latest 3 releases to preserve GitHub storage.
           files: release_apks/*.apk
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prune Old Releases (Keep Latest 3 Releases)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Pruning older releases to keep only the latest 3..."
+          RELEASES=$(gh release list --limit 100 --json tagName -q '.[].tagName')
+          COUNT=0
+          for TAG in $RELEASES; do
+            COUNT=$((COUNT + 1))
+            if [ $COUNT -gt 3 ]; then
+              echo "Pruning older release: $TAG"
+              gh release delete "$TAG" --yes --cleanup-tag || true
+            fi
+          done

@@ -6,8 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.database.ContentObserver
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.CallLog
+import android.provider.Telephony
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -37,6 +42,8 @@ import com.example.util.BiometricHelper
 class MainActivity : FragmentActivity() {
 
     private var auditViewModel: AuditViewModel? = null
+    private var callLogObserver: ContentObserver? = null
+    private var smsLogObserver: ContentObserver? = null
 
     private val auditUpdateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -55,6 +62,26 @@ class MainActivity : FragmentActivity() {
             } else {
                 registerReceiver(auditUpdateReceiver, filter)
             }
+        } catch (_: Exception) {}
+
+        // Register ContentObservers for real-time Call and SMS updates
+        try {
+            val mainHandler = Handler(Looper.getMainLooper())
+            callLogObserver = object : ContentObserver(mainHandler) {
+                override fun onChange(selfChange: Boolean) {
+                    super.onChange(selfChange)
+                    auditViewModel?.refreshLogs()
+                }
+            }
+            contentResolver.registerContentObserver(CallLog.Calls.CONTENT_URI, true, callLogObserver!!)
+
+            smsLogObserver = object : ContentObserver(mainHandler) {
+                override fun onChange(selfChange: Boolean) {
+                    super.onChange(selfChange)
+                    auditViewModel?.refreshLogs()
+                }
+            }
+            contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, smsLogObserver!!)
         } catch (_: Exception) {}
 
         setContent {
@@ -97,7 +124,12 @@ class MainActivity : FragmentActivity() {
                         when (uiState.currentScreen) {
                             AppScreen.ARCHIVE -> viewModel.navigateTo(AppScreen.DASHBOARD)
                             AppScreen.SETTINGS -> viewModel.navigateTo(AppScreen.DASHBOARD)
-                            AppScreen.DASHBOARD -> viewModel.lockApp()
+                            AppScreen.DASHBOARD -> {
+                                if (uiState.isAutoLockOnBack) {
+                                    viewModel.lockApp()
+                                }
+                                finish()
+                            }
                             AppScreen.LOCK, AppScreen.SETUP, AppScreen.ONBOARDING -> finish()
                         }
                     }
@@ -183,7 +215,8 @@ class MainActivity : FragmentActivity() {
                                             Manifest.permission.READ_CONTACTS
                                         )
                                     )
-                                }
+                                },
+                                onLoadFullHistory = { viewModel.loadFullHistory() }
                             )
                         }
 
@@ -209,6 +242,8 @@ class MainActivity : FragmentActivity() {
                                 onSyncNow = { viewModel.syncToCloud() },
                                 isBiometricEnabled = uiState.isBiometricEnabled,
                                 onToggleBiometric = { enabled -> viewModel.setBiometricEnabled(enabled) },
+                                isAutoLockOnBack = uiState.isAutoLockOnBack,
+                                onToggleAutoLock = { enabled -> viewModel.setAutoLockOnBack(enabled) },
                                 isDemoDataEnabled = uiState.isDemoDataEnabled,
                                 onToggleDemoData = { enabled -> viewModel.toggleDemoData(enabled) },
                                 onChangePin = { oldPin, newPin, hint ->
@@ -253,14 +288,20 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Auto-lock when user leaves the app or switches to home screen
-        auditViewModel?.lockApp()
+        // Auto-lock when user leaves the app or switches to home screen if enabled
+        if (auditViewModel?.uiState?.value?.isAutoLockOnBack == true) {
+            auditViewModel?.lockApp()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         try {
             unregisterReceiver(auditUpdateReceiver)
+        } catch (_: Exception) {}
+        try {
+            callLogObserver?.let { contentResolver.unregisterContentObserver(it) }
+            smsLogObserver?.let { contentResolver.unregisterContentObserver(it) }
         } catch (_: Exception) {}
     }
 }
