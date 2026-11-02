@@ -1,7 +1,9 @@
 package com.example.data
 
 import android.content.Context
+import android.net.Uri
 import android.provider.CallLog
+import android.provider.ContactsContract
 import com.example.model.CallEntry
 import com.example.model.CallType
 
@@ -46,13 +48,26 @@ class CallLogRepository(private val context: Context) {
                 val dateIdx = it.getColumnIndex(CallLog.Calls.DATE)
                 val durationIdx = it.getColumnIndex(CallLog.Calls.DURATION)
 
+                val contactCache = mutableMapOf<String, String?>()
+
                 while (it.moveToNext()) {
                     val id = if (idIdx != -1) it.getLong(idIdx) else 0L
                     val number = if (numberIdx != -1) it.getString(numberIdx) ?: "Unknown" else "Unknown"
-                    val name = if (nameIdx != -1) it.getString(nameIdx) else null
+                    var name = if (nameIdx != -1) it.getString(nameIdx) else null
                     val rawType = if (typeIdx != -1) it.getInt(typeIdx) else 0
                     val date = if (dateIdx != -1) it.getLong(dateIdx) else 0L
                     val duration = if (durationIdx != -1) it.getLong(durationIdx) else 0L
+
+                    // Lookup contact name from phonebook if cachedName is empty
+                    if (name.isNullOrBlank() && number.isNotBlank() && number != "Unknown") {
+                        if (contactCache.containsKey(number)) {
+                            name = contactCache[number]
+                        } else {
+                            val resolved = lookupContactName(number)
+                            contactCache[number] = resolved
+                            name = resolved
+                        }
+                    }
 
                     val callType = when (rawType) {
                         CallLog.Calls.INCOMING_TYPE -> CallType.INCOMING
@@ -81,5 +96,24 @@ class CallLogRepository(private val context: Context) {
         }
 
         return callList
+    }
+
+    private fun lookupContactName(phoneNumber: String): String? {
+        return try {
+            val uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(phoneNumber)
+            )
+            val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+            val cursor = context.contentResolver.query(uri, projection, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val idx = it.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                    if (idx != -1) it.getString(idx) else null
+                } else null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 }

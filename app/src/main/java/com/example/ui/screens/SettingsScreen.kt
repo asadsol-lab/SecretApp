@@ -92,6 +92,7 @@ import com.example.ui.theme.Rose500
 import com.example.ui.theme.Slate200
 import com.example.ui.theme.Slate400
 import com.example.util.DeviceOemHelper
+import com.example.util.NotificationHelper
 import com.example.util.OemDeviceInfo
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -567,40 +568,59 @@ fun SettingsScreen(
             }
 
             // Section 4: WhatsApp Notification Access
+            val isWaListenerActive = NotificationHelper.isNotificationListenerGranted(context)
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardDark),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(Color(0xFF25D366).copy(alpha = 0.15f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = Color(0xFF25D366),
-                                modifier = Modifier.size(20.dp)
-                            )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        if (isWaListenerActive) Color(0xFF25D366).copy(alpha = 0.2f) else Rose500.copy(alpha = 0.2f),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = null,
+                                    tint = if (isWaListenerActive) Color(0xFF25D366) else Rose500,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "WhatsApp Audit Access",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Slate200
+                                    )
+                                )
+                                Text(
+                                    text = if (isWaListenerActive) "Active & Auto-Saving" else "Disabled (Permission Required)",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = if (isWaListenerActive) Color(0xFF25D366) else Rose500,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "WhatsApp Audit Access",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Slate200
-                            )
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Android notification listener service allows privacy-compliant logging of incoming WhatsApp messages and voice/video call notifications.",
+                        text = "Android notification listener service allows privacy-compliant logging of incoming WhatsApp messages and voice/video call notifications directly into the app.",
                         style = MaterialTheme.typography.bodySmall.copy(color = Slate400, lineHeight = 18.sp)
                     )
 
@@ -608,16 +628,19 @@ fun SettingsScreen(
 
                     Button(
                         onClick = {
-                            try {
-                                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                                context.startActivity(intent)
-                            } catch (_: Exception) {}
+                            NotificationHelper.openNotificationListenerSettings(context)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366), contentColor = Navy900),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isWaListenerActive) Navy700 else Color(0xFF25D366),
+                            contentColor = if (isWaListenerActive) Slate200 else Navy900
+                        ),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Open Notification Listener Settings", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isWaListenerActive) "Manage Notification Settings" else "Enable WhatsApp Notification Access",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

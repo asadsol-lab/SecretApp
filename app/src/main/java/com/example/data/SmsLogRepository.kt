@@ -2,6 +2,7 @@ package com.example.data
 
 import android.content.Context
 import android.net.Uri
+import android.provider.ContactsContract
 import android.provider.Telephony
 import com.example.model.SmsEntry
 import com.example.model.SmsType
@@ -29,9 +30,15 @@ class SmsLogRepository(private val context: Context) {
 
         val sortOrder = "${Telephony.Sms.DATE} DESC"
 
+        val contentUri = try {
+            Telephony.Sms.CONTENT_URI
+        } catch (_: Exception) {
+            Uri.parse("content://sms")
+        }
+
         try {
             val cursor = context.contentResolver.query(
-                Telephony.Sms.CONTENT_URI,
+                contentUri,
                 projection,
                 selection,
                 selectionArgs,
@@ -45,12 +52,25 @@ class SmsLogRepository(private val context: Context) {
                 val dateIdx = it.getColumnIndex(Telephony.Sms.DATE)
                 val typeIdx = it.getColumnIndex(Telephony.Sms.TYPE)
 
+                val contactCache = mutableMapOf<String, String?>()
+
                 while (it.moveToNext()) {
                     val id = if (idIdx != -1) it.getLong(idIdx) else 0L
                     val address = if (addressIdx != -1) it.getString(addressIdx) ?: "Unknown" else "Unknown"
                     val body = if (bodyIdx != -1) it.getString(bodyIdx) ?: "" else ""
                     val date = if (dateIdx != -1) it.getLong(dateIdx) else 0L
                     val rawType = if (typeIdx != -1) it.getInt(typeIdx) else 1
+
+                    var contactName: String? = null
+                    if (address.isNotBlank() && address != "Unknown") {
+                        if (contactCache.containsKey(address)) {
+                            contactName = contactCache[address]
+                        } else {
+                            val resolved = lookupContactName(address)
+                            contactCache[address] = resolved
+                            contactName = resolved
+                        }
+                    }
 
                     val smsType = when (rawType) {
                         Telephony.Sms.MESSAGE_TYPE_SENT -> SmsType.SENT
@@ -63,7 +83,7 @@ class SmsLogRepository(private val context: Context) {
                         SmsEntry(
                             id = id,
                             address = address,
-                            cachedName = null,
+                            cachedName = contactName,
                             body = body,
                             type = smsType,
                             timestamp = date
@@ -78,5 +98,24 @@ class SmsLogRepository(private val context: Context) {
         }
 
         return smsList
+    }
+
+    private fun lookupContactName(phoneNumber: String): String? {
+        return try {
+            val uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(phoneNumber)
+            )
+            val projection = arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME)
+            val cursor = context.contentResolver.query(uri, projection, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val idx = it.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                    if (idx != -1) it.getString(idx) else null
+                } else null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 }

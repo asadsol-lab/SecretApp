@@ -1,7 +1,12 @@
 package com.example
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,9 +38,24 @@ class MainActivity : FragmentActivity() {
 
     private var auditViewModel: AuditViewModel? = null
 
+    private val auditUpdateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            auditViewModel?.refreshLogs()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        try {
+            val filter = IntentFilter("com.example.AUDIT_DATA_CHANGED")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(auditUpdateReceiver, filter, RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(auditUpdateReceiver, filter)
+            }
+        } catch (_: Exception) {}
 
         setContent {
             MyApplicationTheme {
@@ -56,20 +76,20 @@ class MainActivity : FragmentActivity() {
                         viewModel.updatePermissions(callGranted, smsGranted)
                     }
 
-                    // Check initial permissions on launch
-                    LaunchedEffect(Unit) {
-                        val callOk = ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            Manifest.permission.READ_CALL_LOG
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        val smsOk = ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            Manifest.permission.READ_SMS
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        viewModel.updatePermissions(callOk, smsOk)
-                        viewModel.updateBatteryOptimizationState()
+                    // Check initial permissions on launch and auto-prompt when entering dashboard
+                    LaunchedEffect(uiState.currentScreen) {
+                        viewModel.checkPermissionsAndRefresh()
+                        if (uiState.currentScreen == AppScreen.DASHBOARD) {
+                            if (!uiState.hasCallLogPermission || !uiState.hasSmsPermission) {
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.READ_CALL_LOG,
+                                        Manifest.permission.READ_SMS,
+                                        Manifest.permission.READ_CONTACTS
+                                    )
+                                )
+                            }
+                        }
                     }
 
                     // Handle back button for sub-screens and auto-lock security
@@ -224,9 +244,21 @@ class MainActivity : FragmentActivity() {
         )
     }
 
+    override fun onResume() {
+        super.onResume()
+        auditViewModel?.checkPermissionsAndRefresh()
+    }
+
     override fun onStop() {
         super.onStop()
         // Auto-lock when user leaves the app or switches to home screen
         auditViewModel?.lockApp()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(auditUpdateReceiver)
+        } catch (_: Exception) {}
     }
 }

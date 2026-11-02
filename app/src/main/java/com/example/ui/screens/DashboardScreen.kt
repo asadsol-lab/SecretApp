@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
+import com.example.util.NotificationHelper
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -256,63 +258,82 @@ fun DashboardScreen(
                 }
             }
 
-            // WhatsApp Notification Listener Enable Banner
+            // WhatsApp Notification Listener Enable / Active Banner
             item {
+                val isListenerOn = uiState.isNotificationListenerGranted
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = CardDark),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isListenerOn) Navy800 else Color(0xFF1E293B)
+                    ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .background(Color(0xFF25D366).copy(alpha = 0.15f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Notifications,
-                                    contentDescription = null,
-                                    tint = Color(0xFF25D366),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "WhatsApp Audit Access",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Slate200
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(
+                                            if (isListenerOn) Color(0xFF25D366).copy(alpha = 0.2f) else Rose500.copy(alpha = 0.2f),
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isListenerOn) Icons.Default.CheckCircle else Icons.Default.Notifications,
+                                        contentDescription = null,
+                                        tint = if (isListenerOn) Color(0xFF25D366) else Rose500,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = if (isListenerOn) "WhatsApp Auto-Save: Active" else "WhatsApp Access: Not Enabled",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isListenerOn) Color(0xFF25D366) else Slate200
+                                        )
+                                    )
+                                    Text(
+                                        text = if (isListenerOn) "Auto-saving incoming WhatsApp messages & calls" else "Android Notification Access required to capture WhatsApp",
+                                        style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    NotificationHelper.openNotificationListenerSettings(context)
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isListenerOn) Navy700 else Color(0xFF25D366),
+                                    contentColor = if (isListenerOn) Slate200 else Navy900
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
                                 Text(
-                                    text = "Android privacy notification listener",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = Slate400),
-                                    fontSize = 11.sp
+                                    text = if (isListenerOn) "Settings" else "Enable Now",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        Button(
-                            onClick = {
-                                try {
-                                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {}
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366), contentColor = Navy900),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Text("Enable", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        if (!isListenerOn) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Tip: In Android Settings, turn ON 'Device Audit Log' under Notification Access. On Android 13+, if grayed out, enable 'Allow restricted settings' in App Info.",
+                                style = MaterialTheme.typography.labelSmall.copy(color = Slate400),
+                                fontSize = 10.sp
+                            )
                         }
                     }
                 }

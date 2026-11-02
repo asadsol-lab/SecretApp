@@ -14,6 +14,7 @@ import com.example.model.LendingSession
 import com.example.model.SmsEntry
 import com.example.model.WhatsAppEntry
 import com.example.util.DeviceOemHelper
+import com.example.util.NotificationHelper
 import com.example.util.OemDeviceInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,12 +60,13 @@ data class AuditUiState(
     val calls: List<CallEntry> = emptyList(),
     val sms: List<SmsEntry> = emptyList(),
     val whatsapp: List<WhatsAppEntry> = emptyList(),
-    val timeFilter: TimeFilter = TimeFilter.SESSION,
+    val timeFilter: TimeFilter = TimeFilter.ALL_TIME,
     val typeFilter: ItemTypeFilter = ItemTypeFilter.ALL,
     val searchQuery: String = "",
     val isDemoDataEnabled: Boolean = false,
     val hasCallLogPermission: Boolean = false,
     val hasSmsPermission: Boolean = false,
+    val isNotificationListenerGranted: Boolean = false,
     val customAppName: String = "Device Audit Log",
     val customAppIcon: String = "SHIELD",
     val isRefreshing: Boolean = false,
@@ -103,6 +105,9 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         val biometricEnabled = securityManager.isBiometricEnabled()
         val currentUser = firestoreSync.getCurrentUser()
         val batteryIgnored = DeviceOemHelper.isBatteryOptimizationIgnored(getApplication())
+        val isListenerGranted = NotificationHelper.isNotificationListenerGranted(getApplication())
+        val callOk = NotificationHelper.isCallLogPermissionGranted(getApplication())
+        val smsOk = NotificationHelper.isSmsPermissionGranted(getApplication())
 
         val initialScreen = when {
             !onbCompleted -> AppScreen.ONBOARDING
@@ -126,7 +131,10 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
                 userEmail = currentUser?.email,
                 userDisplayName = currentUser?.displayName,
                 isBatteryOptimizationIgnored = batteryIgnored,
-                timeFilter = if (activeSession != null) TimeFilter.SESSION else TimeFilter.TODAY
+                isNotificationListenerGranted = isListenerGranted,
+                hasCallLogPermission = callOk,
+                hasSmsPermission = smsOk,
+                timeFilter = if (activeSession != null) TimeFilter.SESSION else TimeFilter.ALL_TIME
             )
         }
 
@@ -430,35 +438,80 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(statusMessage = null) }
     }
 
+    fun checkPermissionsAndRefresh() {
+        val isListenerGranted = NotificationHelper.isNotificationListenerGranted(getApplication())
+        val hasCallPerm = NotificationHelper.isCallLogPermissionGranted(getApplication())
+        val hasSmsPerm = NotificationHelper.isSmsPermissionGranted(getApplication())
+        val batteryIgnored = DeviceOemHelper.isBatteryOptimizationIgnored(getApplication())
+
+        _uiState.update {
+            it.copy(
+                isNotificationListenerGranted = isListenerGranted,
+                hasCallLogPermission = hasCallPerm,
+                hasSmsPermission = hasSmsPerm,
+                isBatteryOptimizationIgnored = batteryIgnored
+            )
+        }
+        refreshLogs()
+    }
+
     fun refreshLogs() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
 
+            val isListenerGranted = NotificationHelper.isNotificationListenerGranted(getApplication())
+            val hasCallPerm = NotificationHelper.isCallLogPermissionGranted(getApplication())
+            val hasSmsPerm = NotificationHelper.isSmsPermissionGranted(getApplication())
+            val isDemo = _uiState.value.isDemoDataEnabled
             val sinceTimestamp = calculateSinceTimestamp(_uiState.value.timeFilter)
 
-            val rawCalls: List<CallEntry>
-            val rawSms: List<SmsEntry>
-            val rawWhatsApp: List<WhatsAppEntry> = securityManager.getWhatsAppLogs(sinceTimestamp)
-
-            val isDemo = _uiState.value.isDemoDataEnabled
-            val hasCallPerm = _uiState.value.hasCallLogPermission
-            val hasSmsPerm = _uiState.value.hasSmsPermission
-
             if (isDemo) {
-                rawCalls = SampleDataProvider.getSampleCalls(sinceTimestamp)
-                rawSms = SampleDataProvider.getSampleSms(sinceTimestamp)
-            } else {
-                val liveCalls = if (hasCallPerm) callRepo.getCallLogs(sinceTimestamp) else emptyList()
-                val liveSms = if (hasSmsPerm) smsRepo.getSmsLogs(sinceTimestamp) else emptyList()
-                rawCalls = liveCalls
-                rawSms = liveSms
+                val rawCalls = SampleDataProvider.getSampleCalls(sinceTimestamp)
+                val rawSms = SampleDataProvider.getSampleSms(sinceTimestamp)
+                val rawWhatsApp = securityManager.getWhatsAppLogs(sinceTimestamp)
+
+                _uiState.update {
+                    it.copy(
+                        calls = rawCalls,
+                        sms = rawSms,
+                        whatsapp = rawWhatsApp,
+                        isNotificationListenerGranted = isListenerGranted,
+                        hasCallLogPermission = hasCallPerm,
+                        hasSmsPermission = hasSmsPerm,
+                        isRefreshing = false
+                    )
+                }
+                return@launch
             }
+
+            // 1. Ingest all available device logs into app's persistent security database
+            if (hasCallPerm) {
+                try {
+                    val liveCalls = callRepo.getCallLogs(0L)
+                    securityManager.saveCalls(liveCalls)
+                } catch (_: Exception) {}
+            }
+
+            if (hasSmsPerm) {
+                try {
+                    val liveSms = smsRepo.getSmsLogs(0L)
+                    securityManager.saveSms(liveSms)
+                } catch (_: Exception) {}
+            }
+
+            // 2. Query persistent internal storage (includes live + historic logs)
+            val savedCalls = securityManager.getSavedCalls(sinceTimestamp)
+            val savedSms = securityManager.getSavedSms(sinceTimestamp)
+            val savedWhatsApp = securityManager.getWhatsAppLogs(sinceTimestamp)
 
             _uiState.update {
                 it.copy(
-                    calls = rawCalls,
-                    sms = rawSms,
-                    whatsapp = rawWhatsApp,
+                    calls = savedCalls,
+                    sms = savedSms,
+                    whatsapp = savedWhatsApp,
+                    isNotificationListenerGranted = isListenerGranted,
+                    hasCallLogPermission = hasCallPerm,
+                    hasSmsPermission = hasSmsPerm,
                     isRefreshing = false
                 )
             }

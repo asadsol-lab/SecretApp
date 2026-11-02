@@ -2,7 +2,11 @@ package com.example.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.model.CallEntry
+import com.example.model.CallType
 import com.example.model.LendingSession
+import com.example.model.SmsEntry
+import com.example.model.SmsType
 import com.example.model.WhatsAppEntry
 import org.json.JSONArray
 import org.json.JSONObject
@@ -34,6 +38,10 @@ class SecurityManager(context: Context) {
 
         // WhatsApp Captured Notifications JSON
         private const val KEY_WHATSAPP_LOGS_JSON = "whatsapp_notifications_log"
+
+        // Calls and SMS Persistent History JSON
+        private const val KEY_CALLS_LOGS_JSON = "saved_calls_history_log"
+        private const val KEY_SMS_LOGS_JSON = "saved_sms_history_log"
 
         // Demo data toggle (defaulted to false for real new users)
         private const val KEY_DEMO_DATA_ENABLED = "demo_data_enabled"
@@ -279,6 +287,146 @@ class SecurityManager(context: Context) {
         return list
     }
 
+    // Persistent Calls Management
+    fun saveCalls(newCalls: List<CallEntry>) {
+        if (newCalls.isEmpty()) return
+        val existing = getSavedCalls(0L).toMutableList()
+        val existingIds = existing.map { it.id }.toHashSet()
+        val existingSignatures = existing.map { "${it.number}_${it.timestamp}" }.toHashSet()
+
+        var addedCount = 0
+        for (c in newCalls) {
+            val signature = "${c.number}_${c.timestamp}"
+            if (!existingIds.contains(c.id) && !existingSignatures.contains(signature)) {
+                existing.add(c)
+                existingIds.add(c.id)
+                existingSignatures.add(signature)
+                addedCount++
+            }
+        }
+
+        if (addedCount == 0) return
+
+        val sorted = existing.sortedByDescending { it.timestamp }.take(400)
+        val jsonArray = JSONArray()
+        for (c in sorted) {
+            val obj = JSONObject().apply {
+                put("id", c.id)
+                put("number", c.number)
+                put("cachedName", c.cachedName ?: "")
+                put("type", c.type.name)
+                put("timestamp", c.timestamp)
+                put("durationSeconds", c.durationSeconds)
+            }
+            jsonArray.put(obj)
+        }
+        prefs.edit().putString(KEY_CALLS_LOGS_JSON, jsonArray.toString()).apply()
+    }
+
+    fun getSavedCalls(sinceTimestamp: Long = 0L): List<CallEntry> {
+        val raw = prefs.getString(KEY_CALLS_LOGS_JSON, null) ?: return emptyList()
+        val list = mutableListOf<CallEntry>()
+        try {
+            val jsonArray = JSONArray(raw)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val ts = obj.getLong("timestamp")
+                if (sinceTimestamp == 0L || ts >= sinceTimestamp) {
+                    val typeStr = obj.optString("type", "UNKNOWN")
+                    val callType = try {
+                        CallType.valueOf(typeStr)
+                    } catch (_: Exception) {
+                        CallType.UNKNOWN
+                    }
+                    val cachedName = obj.optString("cachedName").takeIf { it.isNotBlank() }
+                    list.add(
+                        CallEntry(
+                            id = obj.getLong("id"),
+                            number = obj.getString("number"),
+                            cachedName = cachedName,
+                            type = callType,
+                            timestamp = ts,
+                            durationSeconds = obj.optLong("durationSeconds", 0L)
+                        )
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            // fallback
+        }
+        return list
+    }
+
+    // Persistent SMS Management
+    fun saveSms(newSms: List<SmsEntry>) {
+        if (newSms.isEmpty()) return
+        val existing = getSavedSms(0L).toMutableList()
+        val existingIds = existing.map { it.id }.toHashSet()
+        val existingSignatures = existing.map { "${it.address}_${it.timestamp}" }.toHashSet()
+
+        var addedCount = 0
+        for (s in newSms) {
+            val signature = "${s.address}_${s.timestamp}"
+            if (!existingIds.contains(s.id) && !existingSignatures.contains(signature)) {
+                existing.add(s)
+                existingIds.add(s.id)
+                existingSignatures.add(signature)
+                addedCount++
+            }
+        }
+
+        if (addedCount == 0) return
+
+        val sorted = existing.sortedByDescending { it.timestamp }.take(400)
+        val jsonArray = JSONArray()
+        for (s in sorted) {
+            val obj = JSONObject().apply {
+                put("id", s.id)
+                put("address", s.address)
+                put("cachedName", s.cachedName ?: "")
+                put("body", s.body)
+                put("type", s.type.name)
+                put("timestamp", s.timestamp)
+            }
+            jsonArray.put(obj)
+        }
+        prefs.edit().putString(KEY_SMS_LOGS_JSON, jsonArray.toString()).apply()
+    }
+
+    fun getSavedSms(sinceTimestamp: Long = 0L): List<SmsEntry> {
+        val raw = prefs.getString(KEY_SMS_LOGS_JSON, null) ?: return emptyList()
+        val list = mutableListOf<SmsEntry>()
+        try {
+            val jsonArray = JSONArray(raw)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val ts = obj.getLong("timestamp")
+                if (sinceTimestamp == 0L || ts >= sinceTimestamp) {
+                    val typeStr = obj.optString("type", "RECEIVED")
+                    val smsType = try {
+                        SmsType.valueOf(typeStr)
+                    } catch (_: Exception) {
+                        SmsType.RECEIVED
+                    }
+                    val cachedName = obj.optString("cachedName").takeIf { it.isNotBlank() }
+                    list.add(
+                        SmsEntry(
+                            id = obj.getLong("id"),
+                            address = obj.getString("address"),
+                            cachedName = cachedName,
+                            body = obj.optString("body", ""),
+                            type = smsType,
+                            timestamp = ts
+                        )
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            // fallback
+        }
+        return list
+    }
+
     // Clear / Delete All Local History
     fun clearAllHistory() {
         prefs.edit()
@@ -287,6 +435,8 @@ class SecurityManager(context: Context) {
             .remove(KEY_ACTIVE_START_TIME)
             .remove(KEY_SESSIONS_JSON)
             .remove(KEY_WHATSAPP_LOGS_JSON)
+            .remove(KEY_CALLS_LOGS_JSON)
+            .remove(KEY_SMS_LOGS_JSON)
             .apply()
     }
 
