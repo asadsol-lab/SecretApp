@@ -16,6 +16,7 @@ import com.example.model.WhatsAppEntry
 import com.example.util.DeviceOemHelper
 import com.example.util.NotificationHelper
 import com.example.util.OemDeviceInfo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -109,10 +110,14 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         val callOk = NotificationHelper.isCallLogPermissionGranted(getApplication())
         val smsOk = NotificationHelper.isSmsPermissionGranted(getApplication())
 
+        // ROCK-SOLID SCREEN RESOLUTION:
+        // 1. If Master PIN is already configured -> App MUST direct to LOCK screen.
+        // 2. If no PIN is configured yet and onboarding not done -> ONBOARDING.
+        // 3. If onboarding is done but PIN not configured -> SETUP.
         val initialScreen = when {
+            setupCompleted -> AppScreen.LOCK
             !onbCompleted -> AppScreen.ONBOARDING
-            !setupCompleted -> AppScreen.SETUP
-            else -> AppScreen.LOCK
+            else -> AppScreen.SETUP
         }
 
         _uiState.update {
@@ -160,7 +165,7 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update {
             it.copy(
                 isOnboardingCompleted = true,
-                currentScreen = if (!setupCompleted) AppScreen.SETUP else AppScreen.LOCK
+                currentScreen = if (setupCompleted) AppScreen.LOCK else AppScreen.SETUP
             )
         }
     }
@@ -238,10 +243,17 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun lockApp() {
+        val setupCompleted = securityManager.isSetupCompleted()
+        val onbCompleted = securityManager.isOnboardingCompleted()
+        val targetScreen = when {
+            setupCompleted -> AppScreen.LOCK
+            !onbCompleted -> AppScreen.ONBOARDING
+            else -> AppScreen.SETUP
+        }
         _uiState.update {
             it.copy(
                 isAuthenticated = false,
-                currentScreen = AppScreen.LOCK,
+                currentScreen = targetScreen,
                 selectedDetailItem = null
             )
         }
@@ -254,6 +266,10 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
             screen != AppScreen.ONBOARDING
         ) {
             lockApp()
+            return
+        }
+        // If master PIN is configured, block navigating to onboarding or setup screens
+        if (securityManager.isSetupCompleted() && (screen == AppScreen.ONBOARDING || screen == AppScreen.SETUP)) {
             return
         }
         _uiState.update { it.copy(currentScreen = screen, statusMessage = null) }
@@ -456,14 +472,15 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshLogs() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isRefreshing = true) }
 
             val isListenerGranted = NotificationHelper.isNotificationListenerGranted(getApplication())
             val hasCallPerm = NotificationHelper.isCallLogPermissionGranted(getApplication())
             val hasSmsPerm = NotificationHelper.isSmsPermissionGranted(getApplication())
             val isDemo = _uiState.value.isDemoDataEnabled
-            val sinceTimestamp = calculateSinceTimestamp(_uiState.value.timeFilter)
+            val currentFilter = _uiState.value.timeFilter
+            val sinceTimestamp = calculateSinceTimestamp(currentFilter)
 
             if (isDemo) {
                 val rawCalls = SampleDataProvider.getSampleCalls(sinceTimestamp)
@@ -484,17 +501,17 @@ class AuditViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            // 1. Ingest all available device logs into app's persistent security database
+            // 1. Ingest available device logs in background (max 200 items to avoid ANRs)
             if (hasCallPerm) {
                 try {
-                    val liveCalls = callRepo.getCallLogs(0L)
+                    val liveCalls = callRepo.getCallLogs(sinceTimestamp, limit = 200)
                     securityManager.saveCalls(liveCalls)
                 } catch (_: Exception) {}
             }
 
             if (hasSmsPerm) {
                 try {
-                    val liveSms = smsRepo.getSmsLogs(0L)
+                    val liveSms = smsRepo.getSmsLogs(sinceTimestamp, limit = 200)
                     securityManager.saveSms(liveSms)
                 } catch (_: Exception) {}
             }

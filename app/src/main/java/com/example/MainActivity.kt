@@ -76,10 +76,10 @@ class MainActivity : FragmentActivity() {
                         viewModel.updatePermissions(callGranted, smsGranted)
                     }
 
-                    // Check initial permissions on launch and auto-prompt when entering dashboard
+                    // Check initial permissions and auto-prompt when entering dashboard
                     LaunchedEffect(uiState.currentScreen) {
-                        viewModel.checkPermissionsAndRefresh()
                         if (uiState.currentScreen == AppScreen.DASHBOARD) {
+                            viewModel.checkPermissionsAndRefresh()
                             if (!uiState.hasCallLogPermission || !uiState.hasSmsPermission) {
                                 permissionLauncher.launch(
                                     arrayOf(
@@ -246,7 +246,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        auditViewModel?.checkPermissionsAndRefresh()
+        if (auditViewModel?.uiState?.value?.currentScreen == AppScreen.DASHBOARD) {
+            auditViewModel?.checkPermissionsAndRefresh()
+        }
     }
 
     override fun onStop() {

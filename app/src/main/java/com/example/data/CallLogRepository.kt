@@ -6,10 +6,16 @@ import android.provider.CallLog
 import android.provider.ContactsContract
 import com.example.model.CallEntry
 import com.example.model.CallType
+import java.util.concurrent.ConcurrentHashMap
 
 class CallLogRepository(private val context: Context) {
 
-    fun getCallLogs(sinceTimestamp: Long = 0L): List<CallEntry> {
+    companion object {
+        // Shared contact cache across queries to prevent redundant ContentResolver lookups
+        private val contactCache = ConcurrentHashMap<String, String>()
+    }
+
+    fun getCallLogs(sinceTimestamp: Long = 0L, limit: Int = 200): List<CallEntry> {
         val callList = mutableListOf<CallEntry>()
 
         val projection = arrayOf(
@@ -48,9 +54,9 @@ class CallLogRepository(private val context: Context) {
                 val dateIdx = it.getColumnIndex(CallLog.Calls.DATE)
                 val durationIdx = it.getColumnIndex(CallLog.Calls.DURATION)
 
-                val contactCache = mutableMapOf<String, String?>()
-
-                while (it.moveToNext()) {
+                var count = 0
+                while (it.moveToNext() && count < limit) {
+                    count++
                     val id = if (idIdx != -1) it.getLong(idIdx) else 0L
                     val number = if (numberIdx != -1) it.getString(numberIdx) ?: "Unknown" else "Unknown"
                     var name = if (nameIdx != -1) it.getString(nameIdx) else null
@@ -64,8 +70,10 @@ class CallLogRepository(private val context: Context) {
                             name = contactCache[number]
                         } else {
                             val resolved = lookupContactName(number)
-                            contactCache[number] = resolved
-                            name = resolved
+                            if (resolved != null) {
+                                contactCache[number] = resolved
+                                name = resolved
+                            }
                         }
                     }
 

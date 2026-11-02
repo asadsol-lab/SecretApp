@@ -6,10 +6,16 @@ import android.provider.ContactsContract
 import android.provider.Telephony
 import com.example.model.SmsEntry
 import com.example.model.SmsType
+import java.util.concurrent.ConcurrentHashMap
 
 class SmsLogRepository(private val context: Context) {
 
-    fun getSmsLogs(sinceTimestamp: Long = 0L): List<SmsEntry> {
+    companion object {
+        // Shared contact cache across SMS queries to prevent slow ContentResolver lookups
+        private val contactCache = ConcurrentHashMap<String, String>()
+    }
+
+    fun getSmsLogs(sinceTimestamp: Long = 0L, limit: Int = 200): List<SmsEntry> {
         val smsList = mutableListOf<SmsEntry>()
 
         val projection = arrayOf(
@@ -52,9 +58,9 @@ class SmsLogRepository(private val context: Context) {
                 val dateIdx = it.getColumnIndex(Telephony.Sms.DATE)
                 val typeIdx = it.getColumnIndex(Telephony.Sms.TYPE)
 
-                val contactCache = mutableMapOf<String, String?>()
-
-                while (it.moveToNext()) {
+                var count = 0
+                while (it.moveToNext() && count < limit) {
+                    count++
                     val id = if (idIdx != -1) it.getLong(idIdx) else 0L
                     val address = if (addressIdx != -1) it.getString(addressIdx) ?: "Unknown" else "Unknown"
                     val body = if (bodyIdx != -1) it.getString(bodyIdx) ?: "" else ""
@@ -67,8 +73,10 @@ class SmsLogRepository(private val context: Context) {
                             contactName = contactCache[address]
                         } else {
                             val resolved = lookupContactName(address)
-                            contactCache[address] = resolved
-                            contactName = resolved
+                            if (resolved != null) {
+                                contactCache[address] = resolved
+                                contactName = resolved
+                            }
                         }
                     }
 

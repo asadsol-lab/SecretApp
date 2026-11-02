@@ -66,7 +66,8 @@ class SecurityManager(context: Context) {
     }
 
     fun isSetupCompleted(): Boolean {
-        return prefs.getBoolean(KEY_SETUP_COMPLETED, false)
+        val masterHash = prefs.getString(KEY_MASTER_HASH, "") ?: ""
+        return prefs.getBoolean(KEY_SETUP_COMPLETED, false) && masterHash.isNotBlank()
     }
 
     fun setupPin(masterPin: String, hint: String = ""): Boolean {
@@ -307,7 +308,7 @@ class SecurityManager(context: Context) {
 
         if (addedCount == 0) return
 
-        val sorted = existing.sortedByDescending { it.timestamp }.take(400)
+        val sorted = existing.sortedByDescending { it.timestamp }.take(250)
         val jsonArray = JSONArray()
         for (c in sorted) {
             val obj = JSONObject().apply {
@@ -377,7 +378,7 @@ class SecurityManager(context: Context) {
 
         if (addedCount == 0) return
 
-        val sorted = existing.sortedByDescending { it.timestamp }.take(400)
+        val sorted = existing.sortedByDescending { it.timestamp }.take(250)
         val jsonArray = JSONArray()
         for (s in sorted) {
             val obj = JSONObject().apply {

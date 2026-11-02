@@ -50,19 +50,19 @@ jobs:
       - name: Rename APK for Release
         run: |
           mkdir -p release_apks
-          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} release_apks/DeviceAuditLog-v1.2.apk \;
+          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} release_apks/DeviceAuditLog-v1.3.apk \;
           ls -la release_apks/
 
       - name: Create GitHub Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.${{ github.run_number }}
-          name: "Device Audit Log v1.2 (Build ${{ github.run_number }})"
+          tag_name: v1.3.${{ github.run_number }}
+          name: "Device Audit Log v1.3 (Build ${{ github.run_number }})"
           body: |
-            ### Device Audit Log v1.2 - Release Build
-            - Persistent internal storage for all Call Logs (incoming, outgoing, missed, duration) and SMS messages.
-            - WhatsApp notifications auto-saved (messages & voice/video calls) via Android NotificationListenerService.
-            - Real-time broadcast and onResume auto-refresh: activities appear immediately in the app.
+            ### Device Audit Log v1.3 - Performance & Stability Release
+            - Fixed ANR (App Not Responding) crash on devices with huge call/SMS history: all queries and JSON serialization moved to background `Dispatchers.IO` with 200-item query limits and shared contact name caching.
+            - Fixed screen navigation race condition: when Master PIN is configured, app deterministically displays the Lock screen and prevents Onboarding/Setup from reappearing.
+            - Instant, lag-free app launch and responsive UI.
             - Reactive Notification Access banner with 1-tap launcher to enable WhatsApp auditing.
             - Single Master PIN protection, Biometric Fingerprint unlock, and Google Cloud Firestore backup sync.
             - Device OEM battery optimization detection (Samsung, Xiaomi, Oppo, Vivo, OnePlus).
